@@ -1,0 +1,61 @@
+# 多架构 Dockerfile
+# 自动检测架构，支持 amd64 和 arm64
+# 适用于: x86_64 服务器、树莓派、Apple Silicon Mac、ARM 服务器等
+
+FROM python:3.11-slim
+
+# 获取目标架构
+ARG TARGETARCH
+
+# 安装依赖（根据架构选择包）
+RUN apt-get update && \
+    # 基础依赖（所有架构通用）
+    apt-get install -y \
+        chromium \
+        chromium-driver \
+        xvfb \
+        fonts-wqy-zenhei \
+        fonts-wqy-microhei \
+    && \
+    # ARM64 额外依赖
+    if [ "$TARGETARCH" = "arm64" ]; then \
+        apt-get install -y \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libdrm2 \
+            libxkbcommon0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libgbm1 \
+            libasound2 \
+        ; \
+    fi && \
+    rm -rf /var/lib/apt/lists/*
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制项目文件
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+# 创建用户数据目录
+RUN mkdir -p /root/.linuxdo-browser /app/logs
+
+# 设置环境变量
+ENV PYTHONUNBUFFERED=1
+ENV BROWSER_PATH=/usr/bin/chromium
+ENV USER_DATA_DIR=/root/.linuxdo-browser
+ENV HEADLESS=false
+
+# 启动脚本
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+CMD ["python", "main.py"]

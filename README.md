@@ -15,6 +15,7 @@
   - [方案C：Linux cron](#方案clinux-cron)
   - [方案D：Docker 部署](#方案ddocker-部署)
   - [方案E：青龙面板](#方案e青龙面板)
+  - [方案F：ARM 设备部署](#方案farm-设备部署)
 - [配置说明](#配置说明)
 - [Telegram 通知](#telegram-通知)
 - [常见问题](#常见问题)
@@ -153,11 +154,13 @@
 | **Linux** | cron | `scripts/setup_task_linux.sh` | ⭐⭐ 中等 |
 | **Docker** | docker-compose | `docker-compose.yml` | ⭐⭐⭐ 较难 |
 | **青龙面板** | 内置调度 | `ql_main.py` | ⭐⭐⭐ 较难 |
+| **ARM 设备** | cron / Docker | `scripts/setup_arm.sh` | ⭐⭐ 中等 |
 
 **推荐选择：**
 - 个人电脑：Windows / macOS 方案
 - 服务器：Linux / Docker 方案
 - 已有青龙面板：青龙方案
+- 树莓派/ARM 服务器：ARM 设备方案
 
 ---
 
@@ -685,6 +688,225 @@ python3 main.py --first-login
 
 ---
 
+### 方案F：ARM 设备部署
+
+**适用场景：** 树莓派、Orange Pi、ARM 服务器、Apple Silicon Mac 等 ARM 架构设备
+
+**支持设备：**
+
+| 设备类型 | 架构 | 支持状态 |
+|----------|------|----------|
+| 树莓派 4/5 | ARM64 | ✅ 完全支持 |
+| 树莓派 3B+ | ARM64/ARM32 | ⚠️ ARM64 推荐 |
+| Orange Pi | ARM64 | ✅ 完全支持 |
+| Apple Silicon Mac | ARM64 | ✅ 完全支持 |
+| ARM 云服务器 | ARM64 | ✅ 完全支持 |
+| 其他 ARM64 设备 | ARM64 | ✅ 完全支持 |
+
+**前置条件：**
+- ARM64 架构（推荐）或 ARM32
+- 已安装 Python 3.8+
+- 已安装 Chromium 浏览器
+- 已安装 Xvfb（虚拟显示）
+- 至少 1GB 内存（推荐 2GB+）
+
+#### 方式一：使用安装脚本（推荐）
+
+**步骤 1：赋予执行权限**
+
+```bash
+chmod +x scripts/setup_arm.sh
+```
+
+**步骤 2：运行安装脚本**
+
+```bash
+./scripts/setup_arm.sh
+```
+
+**步骤 3：选择「完整安装」**
+
+```
+========================================
+LinuxDO 签到 - ARM 设备安装脚本
+========================================
+
+系统信息:
+  架构: aarch64
+  系统: Debian GNU/Linux 12 (bookworm)
+  设备: Raspberry Pi 4 Model B Rev 1.4
+
+请选择操作:
+  1. 完整安装（推荐）
+  2. 仅安装系统依赖
+  3. 仅安装 Python 依赖
+  4. 配置 Chromium 路径
+  5. 测试 Chromium
+  6. 设置定时任务
+  7. 首次登录
+  8. 运行签到
+  9. 查看系统信息
+  0. 退出
+```
+
+选择 `1` 进行完整安装，脚本会自动：
+- 检测系统架构和操作系统
+- 安装 Chromium、Xvfb、中文字体等依赖
+- 创建 Python 虚拟环境并安装依赖
+- 配置 Chromium 路径
+- 测试 Chromium 是否正常
+
+**步骤 4：首次登录**
+
+```bash
+# 需要图形界面（VNC 或本地桌面）
+./scripts/setup_arm.sh
+# 选择 7. 首次登录
+```
+
+**步骤 5：设置定时任务**
+
+```bash
+./scripts/setup_arm.sh
+# 选择 6. 设置定时任务
+```
+
+#### 方式二：使用 Docker（ARM 版）
+
+**步骤 1：构建 ARM 镜像**
+
+```bash
+# 使用 ARM 专用 Dockerfile
+docker-compose -f docker-compose.arm.yml build
+```
+
+**步骤 2：首次登录**
+
+```bash
+# 需要 X11 转发或 VNC
+xhost +local:docker
+docker-compose -f docker-compose.arm.yml run --rm \
+    -e DISPLAY=$DISPLAY \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    linuxdo-checkin python main.py --first-login
+```
+
+**步骤 3：启动服务**
+
+```bash
+docker-compose -f docker-compose.arm.yml up -d
+```
+
+#### 方式三：手动安装
+
+**步骤 1：安装系统依赖**
+
+```bash
+# Debian/Ubuntu/Raspberry Pi OS
+sudo apt-get update
+sudo apt-get install -y \
+    python3 python3-pip python3-venv \
+    chromium-browser chromium-chromedriver \
+    xvfb \
+    fonts-wqy-zenhei fonts-wqy-microhei \
+    libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+    libdrm2 libxkbcommon0 libxcomposite1 \
+    libxdamage1 libxfixes3 libxrandr2 \
+    libgbm1 libasound2
+```
+
+**步骤 2：安装 Python 依赖**
+
+```bash
+# 创建虚拟环境
+python3 -m venv venv
+source venv/bin/activate
+
+# 安装依赖
+pip install -r requirements.txt
+```
+
+**步骤 3：配置 Chromium 路径**
+
+编辑 `config.yaml`：
+
+```yaml
+# 树莓派/Debian 通常是这个路径
+browser_path: "/usr/bin/chromium-browser"
+```
+
+**步骤 4：首次登录**
+
+```bash
+# 需要图形界面
+source venv/bin/activate
+python main.py --first-login
+```
+
+**步骤 5：设置 cron 定时任务**
+
+```bash
+crontab -e
+
+# 添加以下内容（修改路径）
+0 8 * * * cd /home/pi/linuxdo-checkin && xvfb-run -a ./venv/bin/python main.py >> logs/checkin.log 2>&1
+0 20 * * * cd /home/pi/linuxdo-checkin && xvfb-run -a ./venv/bin/python main.py >> logs/checkin.log 2>&1
+```
+
+#### ARM 设备优化建议
+
+**树莓派内存优化：**
+
+```bash
+# 增加 swap（如果内存不足）
+sudo dphys-swapfile swapoff
+sudo nano /etc/dphys-swapfile
+# 设置 CONF_SWAPSIZE=2048
+sudo dphys-swapfile setup
+sudo dphys-swapfile swapon
+
+# 增加 GPU 内存
+sudo nano /boot/config.txt
+# 添加 gpu_mem=128
+sudo reboot
+```
+
+**Docker 内存限制：**
+
+`docker-compose.arm.yml` 已配置内存限制：
+- 最大内存：1GB
+- 保留内存：512MB
+
+如需调整，编辑 `docker-compose.arm.yml`：
+
+```yaml
+deploy:
+  resources:
+    limits:
+      memory: 2G  # 增加到 2GB
+    reservations:
+      memory: 1G
+```
+
+#### ARM 相关文件
+
+| 文件 | 说明 |
+|------|------|
+| `Dockerfile.arm` | ARM64 专用 Dockerfile |
+| `Dockerfile.multi` | 多架构 Dockerfile（自动检测） |
+| `docker-compose.arm.yml` | ARM 专用 Docker Compose |
+| `scripts/setup_arm.sh` | ARM 设备安装脚本 |
+
+#### 注意事项
+
+1. **推荐 ARM64** - ARM32（armv7）支持有限，建议使用 64 位系统
+2. **内存要求** - 至少 1GB，推荐 2GB+（Chromium 较占内存）
+3. **首次登录** - 需要图形界面（VNC 或本地桌面）
+4. **散热** - 树莓派运行 Chromium 会发热，建议加装散热片/风扇
+5. **SD 卡** - 建议使用高速 SD 卡（Class 10 / A1 / A2）
+
+---
+
 ## 配置说明
 
 ### 配置文件 config.yaml
@@ -914,6 +1136,35 @@ like_probability: 0  # 不点赞
 2. 每个目录配置不同的 `user_data_dir`
 3. 分别运行首次登录和定时任务
 
+### Q11: 树莓派/ARM 设备支持吗？
+
+**A:** 支持。使用方案F（ARM 设备部署）：
+
+1. 运行 `./scripts/setup_arm.sh` 安装脚本
+2. 选择「完整安装」自动配置环境
+3. 或使用 `docker-compose.arm.yml` 部署 Docker
+
+**注意事项：**
+- 推荐 ARM64 架构（64位系统）
+- 至少 1GB 内存，推荐 2GB+
+- 树莓派建议加装散热片
+
+### Q12: ARM 设备上 Chromium 启动失败？
+
+**A:** 常见原因和解决方法：
+
+1. **缺少依赖库** - 运行 `./scripts/setup_arm.sh` 选择「仅安装系统依赖」
+2. **内存不足** - 增加 swap 或减少 `browse_count`
+3. **路径错误** - 检查 `config.yaml` 中的 `browser_path`
+
+```bash
+# 查找 Chromium 路径
+which chromium-browser || which chromium
+
+# 测试 Chromium
+xvfb-run -a chromium-browser --version
+```
+
 ---
 
 ## 故障排除
@@ -1033,6 +1284,79 @@ mkdir -p ~/.linuxdo-browser
 chmod 755 ~/.linuxdo-browser
 ```
 
+### 问题 8：ARM 设备 Chromium 崩溃
+
+**错误信息：**
+```
+[浏览器] 启动失败: Chromium crashed
+```
+
+**解决方法：**
+
+1. **增加 swap**（树莓派）：
+```bash
+sudo dphys-swapfile swapoff
+sudo nano /etc/dphys-swapfile
+# 设置 CONF_SWAPSIZE=2048
+sudo dphys-swapfile setup
+sudo dphys-swapfile swapon
+```
+
+2. **减少浏览数量**：
+```yaml
+browse_count: 5  # 减少到 5 篇
+```
+
+3. **使用 Docker 内存限制**：
+```bash
+docker-compose -f docker-compose.arm.yml up -d
+# 已配置最大 1GB 内存
+```
+
+### 问题 9：ARM Docker 构建失败
+
+**错误信息：**
+```
+ERROR: no matching manifest for linux/arm64/v8
+```
+
+**解决方法：**
+
+使用 ARM 专用配置：
+```bash
+# 使用 ARM 专用 Dockerfile
+docker-compose -f docker-compose.arm.yml build
+
+# 或使用多架构 Dockerfile
+docker build -f Dockerfile.multi -t linuxdo-checkin .
+```
+
+### 问题 10：ARM 设备找不到 Chromium
+
+**错误信息：**
+```
+FileNotFoundError: [Errno 2] No such file or directory: 'chromium'
+```
+
+**解决方法：**
+
+1. **查找 Chromium 路径**：
+```bash
+which chromium-browser || which chromium || find /usr -name "chromium*" -type f 2>/dev/null
+```
+
+2. **更新配置**：
+```yaml
+# config.yaml
+browser_path: "/usr/bin/chromium-browser"  # 或实际路径
+```
+
+3. **重新安装**：
+```bash
+# Debian/Ubuntu/Raspberry Pi OS
+sudo apt-get install -y chromium-browser
+```
+
 ---
 
 ## 项目结构
@@ -1048,15 +1372,19 @@ linuxdo-checkin/
 ├── scripts/                     # 定时任务脚本
 │   ├── setup_task.bat          # Windows 任务计划
 │   ├── setup_task.sh           # macOS launchd
-│   └── setup_task_linux.sh     # Linux cron
+│   ├── setup_task_linux.sh     # Linux cron
+│   └── setup_arm.sh            # ARM 设备安装脚本
 ├── main.py                      # 主入口（支持 --first-login）
 ├── ql_main.py                  # 青龙面板入口
 ├── reminder.py                 # Telegram 提醒脚本
 ├── config.yaml                 # 配置文件
 ├── .env.example                # 环境变量示例
 ├── requirements.txt            # Python 依赖
-├── Dockerfile                  # Docker 镜像
-├── docker-compose.yml          # Docker Compose
+├── Dockerfile                  # Docker 镜像（x86_64）
+├── Dockerfile.arm              # Docker 镜像（ARM64 专用）
+├── Dockerfile.multi            # Docker 镜像（多架构自动检测）
+├── docker-compose.yml          # Docker Compose（x86_64）
+├── docker-compose.arm.yml      # Docker Compose（ARM 专用）
 ├── docker-entrypoint.sh        # Docker 入口脚本
 └── README.md                   # 项目说明
 ```
@@ -1074,7 +1402,7 @@ linuxdo-checkin/
 ### v1.0.0 (2026-01-30)
 
 - 初始版本
-- 支持 Windows/macOS/Linux/Docker/青龙面板
+- 支持 Windows/macOS/Linux/Docker/青龙面板/ARM 设备
 - 自动浏览帖子（热门+最新混合）
 - 随机点赞
 - 等级识别和升级进度
