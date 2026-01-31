@@ -169,32 +169,32 @@
 
 安装脚本位于 **`一键安装脚本点这里/`** 文件夹中，提供两种方式：
 
-### 方式一：Polyglot 脚本（推荐，无需 Python）
+### 方式一：傻瓜式一键安装（推荐，无需 Python）
 
-`install.cmd` 是一个多语言脚本，**同一个文件**在不同平台自动运行：
+`傻瓜式一键安装.cmd` 是一个多语言脚本，**同一个文件**在不同平台自动运行：
 
 ```bash
 # 进入脚本目录
 cd 一键安装脚本点这里
 
-# Windows: 双击 install.cmd 或命令行运行
-install.cmd
+# Windows: 双击 傻瓜式一键安装.cmd 或命令行运行
+傻瓜式一键安装.cmd
 
 # Linux/macOS: 赋予执行权限后运行
-chmod +x install.cmd
-./install.cmd
+chmod +x 傻瓜式一键安装.cmd
+./傻瓜式一键安装.cmd
 ```
 
 **优点**：无需预装 Python，脚本会自动安装所有依赖。
 
-### 方式二：Python 脚本（功能更完整）
+### 方式二：Python 全自动安装（功能更完整）
 
 ```bash
 # 进入脚本目录
 cd 一键安装脚本点这里
 
 # 所有平台通用（需要 Python 3.8+）
-python setup.py
+python py全自动安装.py
 ```
 
 **优点**：功能更完整，配置编辑更方便。
