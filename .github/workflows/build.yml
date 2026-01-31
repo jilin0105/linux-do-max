@@ -38,7 +38,7 @@ jobs:
 
   # macOS x64 打包
   build-macos-x64:
-    runs-on: macos-13  # Intel Mac
+    runs-on: macos-15  # Intel Mac
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
