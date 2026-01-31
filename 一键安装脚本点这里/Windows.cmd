@@ -16,7 +16,7 @@ echo.
 echo +--------------------------------------------+
 echo ^|            系统环境检测结果                ^|
 echo +--------------------------------------------+
-echo ^| 操作系统     ^| Windows                      ^|
+echo ^| 操作系统     ^| Windows                     ^|
 
 if "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
     echo ^| 架构         ^| x86_64 ^(x64^)                ^|
@@ -39,7 +39,7 @@ if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "CHROME_
 if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" set "CHROME_PATH=%LocalAppData%\Google\Chrome\Application\chrome.exe"
 
 if defined CHROME_PATH (
-    echo ^| 浏览器       ^| 已安装                       ^|
+    echo ^| 浏览器       ^| 已安装                      ^|
 ) else (
     echo ^| 浏览器       ^| 未安装                       ^|
 )
