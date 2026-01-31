@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
 set "VERSION=1.2.0"
@@ -6,30 +7,30 @@ cd /d "%~dp0.."
 
 echo.
 echo ============================================================
-echo      LinuxDO Ç©µ½Ò»¼ü°²×°½Å±¾ v%VERSION% [Windows]
+echo      LinuxDO ç­¾åˆ°ä¸€é”®å®‰è£…è„šæœ¬ v%VERSION% [Windows]
 echo ============================================================
 echo.
 
-echo [INFO] ¼ì²âÏµÍ³»·¾³...
+echo [ä¿¡æ¯] æ£€æµ‹ç³»ç»ŸçŽ¯å¢ƒ...
 echo.
-echo +-------------------------------------------+
-echo ^|           ÏµÍ³»·¾³¼ì²â½á¹û                ^|
-echo +-------------------------------------------+
-echo ^| ²Ù×÷ÏµÍ³     ^| Windows                   ^|
+echo +--------------------------------------------+
+echo ^|            ç³»ç»ŸçŽ¯å¢ƒæ£€æµ‹ç»“æžœ                ^|
+echo +--------------------------------------------+
+echo ^| æ“ä½œç³»ç»Ÿ     ^| Windows                      ^|
 
 if "%PROCESSOR_ARCHITECTURE%"=="AMD64" (
-    echo ^| ¼Ü¹¹         ^| 64-bit                    ^|
+    echo ^| æž¶æž„         ^| x86_64 ^(x64^)                ^|
 ) else (
-    echo ^| ¼Ü¹¹         ^| 32-bit                    ^|
+    echo ^| æž¶æž„         ^| x86 ^(32-bit^)               ^|
 )
 
 set "PYTHON_OK=0"
 where python >nul 2>&1 && set "PYTHON_OK=1"
 if %PYTHON_OK%==1 (
-    for /f "tokens=*" %%v in ('python --version 2^>^&1') do set "PY_VER=%%v"
-    echo ^| Python       ^| !PY_VER!                  ^|
+    for /f "tokens=2 delims= " %%v in ('python --version 2^>^&1') do set "PY_VER=%%v"
+    echo ^| Python       ^| !PY_VER!                     ^|
 ) else (
-    echo ^| Python       ^| Î´°²×°                    ^|
+    echo ^| Python       ^| æœªå®‰è£…                       ^|
 )
 
 set "CHROME_PATH="
@@ -38,35 +39,35 @@ if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "CHROME_
 if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" set "CHROME_PATH=%LocalAppData%\Google\Chrome\Application\chrome.exe"
 
 if defined CHROME_PATH (
-    echo ^| Chrome       ^| ÒÑ°²×°                    ^|
+    echo ^| æµè§ˆå™¨       ^| å·²å®‰è£…                       ^|
 ) else (
-    echo ^| Chrome       ^| Î´°²×°                    ^|
+    echo ^| æµè§ˆå™¨       ^| æœªå®‰è£…                       ^|
 )
-echo +-------------------------------------------+
+echo +--------------------------------------------+
 echo.
 
 if %PYTHON_OK%==0 (
-    echo [´íÎó] Î´¼ì²âµ½ Python
+    echo [é”™è¯¯] æœªæ£€æµ‹åˆ° Python
     echo.
-    echo Çë°²×° Python:
-    echo   1. ·ÃÎÊ https://www.python.org/downloads/
-    echo   2. ÏÂÔØ²¢°²×° Python 3.8+
-    echo   3. °²×°Ê±¹´Ñ¡ "Add Python to PATH"
+    echo è¯·å®‰è£… Python:
+    echo   1. è®¿é—® https://www.python.org/downloads/
+    echo   2. ä¸‹è½½å¹¶å®‰è£… Python 3.8+
+    echo   3. å®‰è£…æ—¶å‹¾é€‰ "Add Python to PATH"
     echo.
     pause
     exit /b 1
 )
 
 if not defined CHROME_PATH (
-    echo [¾¯¸æ] Î´¼ì²âµ½ Chrome ä¯ÀÀÆ÷
-    echo [ÌáÊ¾] Çë´Ó https://www.google.com/chrome/ ÏÂÔØ°²×°
+    echo [è­¦å‘Š] æœªæ£€æµ‹åˆ° Chrome æµè§ˆå™¨
+    echo [æç¤º] è¯·è®¿é—® https://www.google.com/chrome/ ä¸‹è½½å®‰è£…
     echo.
 )
 
 if not exist "main.py" (
     if not exist "requirements.txt" (
-        echo [´íÎó] ÇëÔÚÏîÄ¿Ä¿Â¼ÏÂÔËÐÐ´Ë½Å±¾
-        echo [ÌáÊ¾] µ±Ç°Ä¿Â¼: %CD%
+        echo [é”™è¯¯] è¯·åœ¨é¡¹ç›®ç›®å½•ä¸‹è¿è¡Œæ­¤è„šæœ¬
+        echo [æç¤º] å½“å‰ç›®å½•: %CD%
         echo.
         pause
         exit /b 1
@@ -75,20 +76,20 @@ if not exist "main.py" (
 
 :menu
 echo.
-echo +-------------------------------------------+
-echo ^|              Ö÷²Ëµ¥                       ^|
-echo +-------------------------------------------+
-echo ^|  1. Ò»¼ü°²×°£¨ÍÆ¼ö£©                      ^|
-echo ^|  2. ½öÅäÖÃ Python »·¾³                    ^|
-echo ^|  3. ±à¼­ÅäÖÃÎÄ¼þ                          ^|
-echo ^|  4. ÉèÖÃ¶¨Ê±ÈÎÎñ                          ^|
-echo ^|  5. Ê×´ÎµÇÂ¼                              ^|
-echo ^|  6. ÔËÐÐÇ©µ½                              ^|
-echo ^|  0. ÍË³ö                                  ^|
-echo +-------------------------------------------+
+echo +--------------------------------------------+
+echo ^|                ä¸»èœå•                      ^|
+echo +--------------------------------------------+
+echo ^|  1. ä¸€é”®å®‰è£…ï¼ˆæŽ¨èï¼‰                       ^|
+echo ^|  2. ä»…é…ç½® Python çŽ¯å¢ƒ                     ^|
+echo ^|  3. ç¼–è¾‘é…ç½®æ–‡ä»¶                           ^|
+echo ^|  4. è®¾ç½®å®šæ—¶ä»»åŠ¡                           ^|
+echo ^|  5. é¦–æ¬¡ç™»å½•                               ^|
+echo ^|  6. è¿è¡Œç­¾åˆ°                               ^|
+echo ^|  0. é€€å‡º                                   ^|
+echo +--------------------------------------------+
 echo.
 set "choice="
-set /p choice="ÇëÑ¡Ôñ [0-6]: "
+set /p choice="è¯·é€‰æ‹© [0-6]: "
 
 if "%choice%"=="0" goto :exit_script
 if "%choice%"=="1" goto :full_install
@@ -97,7 +98,7 @@ if "%choice%"=="3" goto :edit_config
 if "%choice%"=="4" goto :setup_task
 if "%choice%"=="5" goto :first_login
 if "%choice%"=="6" goto :run_checkin
-echo [´íÎó] ÎÞÐ§Ñ¡Ïî
+echo [é”™è¯¯] æ— æ•ˆé€‰é¡¹
 goto :menu
 
 :full_install
@@ -111,67 +112,72 @@ goto :menu
 
 :setup_python
 echo.
-echo [INFO] ÅäÖÃ Python »·¾³...
+echo [ä¿¡æ¯] é…ç½® Python çŽ¯å¢ƒ...
 if not exist "venv" (
-    echo [INFO] ´´½¨ÐéÄâ»·¾³...
+    echo [ä¿¡æ¯] åˆ›å»ºè™šæ‹ŸçŽ¯å¢ƒ...
     python -m venv venv
     if errorlevel 1 (
-        echo [´íÎó] ´´½¨ÐéÄâ»·¾³Ê§°Ü
+        echo [é”™è¯¯] åˆ›å»ºè™šæ‹ŸçŽ¯å¢ƒå¤±è´¥
         pause
         exit /b 1
     )
 )
-echo [INFO] Éý¼¶ pip...
-venv\Scripts\python.exe -m pip install --upgrade pip >nul 2>&1
-echo [INFO] °²×°ÒÀÀµ°ü...
-venv\Scripts\pip.exe install -r requirements.txt
-if errorlevel 1 (
-    echo [´íÎó] °²×°ÒÀÀµÊ§°Ü
+if not exist "venv\Scripts\python.exe" (
+    echo [é”™è¯¯] è™šæ‹ŸçŽ¯å¢ƒåˆ›å»ºå¤±è´¥ï¼Œvenv\Scripts\python.exe ä¸å­˜åœ¨
     pause
     exit /b 1
 )
-echo [³É¹¦] Python »·¾³ÅäÖÃÍê³É
+echo [ä¿¡æ¯] å‡çº§ pip...
+venv\Scripts\python.exe -m pip install --upgrade pip >nul 2>&1
+echo [ä¿¡æ¯] å®‰è£…ä¾èµ–åŒ…...
+venv\Scripts\pip.exe install -r requirements.txt
+if errorlevel 1 (
+    echo [é”™è¯¯] å®‰è£…ä¾èµ–å¤±è´¥
+    pause
+    exit /b 1
+)
+echo [æˆåŠŸ] Python çŽ¯å¢ƒé…ç½®å®Œæˆ
 echo.
 goto :eof
 
 :interactive_config
 echo.
-echo [INFO] ÅäÖÃÏòµ¼...
+echo [ä¿¡æ¯] é…ç½®å‘å¯¼...
 echo.
 
 if exist "config.yaml" (
-    echo [¾¯¸æ] ¼ì²âµ½ÒÑÓÐÅäÖÃÎÄ¼þ
+    echo [è­¦å‘Š] æ£€æµ‹åˆ°å·²æœ‰é…ç½®æ–‡ä»¶
     set "reconfig="
-    set /p reconfig="ÊÇ·ñÖØÐÂÅäÖÃ£¿[y/N]: "
+    set /p reconfig="æ˜¯å¦é‡æ–°é…ç½®ï¼Ÿ[y/N]: "
     if /i not "!reconfig!"=="y" goto :eof
 )
 
 echo.
-echo === »ù±¾ÅäÖÃ ===
+echo === åŸºæœ¬é…ç½® ===
 set "USERNAME="
-set /p USERNAME="Linux.do ÓÃ»§Ãû (¿ÉÑ¡£¬°´ Enter Ìø¹ý): "
+set /p USERNAME="Linux.do ç”¨æˆ·å (å¯é€‰ï¼ŒæŒ‰ Enter è·³è¿‡): "
 if defined USERNAME (
     set "PASSWORD="
-    set /p PASSWORD="Linux.do ÃÜÂë (¿ÉÑ¡): "
+    set /p PASSWORD="Linux.do å¯†ç  (å¯é€‰): "
 )
 
 echo.
 set "BROWSE_COUNT="
-set /p BROWSE_COUNT="ä¯ÀÀÌû×ÓÊýÁ¿ [10]: "
+set /p BROWSE_COUNT="æµè§ˆå¸–å­æ•°é‡ [10]: "
 if not defined BROWSE_COUNT set "BROWSE_COUNT=10"
 
 set "LIKE_PROB="
-set /p LIKE_PROB="µãÔÞ¸ÅÂÊ (0-1) [0.3]: "
+set /p LIKE_PROB="ç‚¹èµžæ¦‚çŽ‡ (0-1) [0.3]: "
 if not defined LIKE_PROB set "LIKE_PROB=0.3"
 
 set "HEADLESS="
-set /p HEADLESS="ÎÞÍ·Ä£Ê½ (true/false) [false]: "
+set /p HEADLESS="æ— å¤´æ¨¡å¼ (true/false) [false]: "
 if not defined HEADLESS set "HEADLESS=false"
 
 echo.
-echo === Telegram Í¨Öª (¿ÉÑ¡) ===
+echo === Telegram é€šçŸ¥ (å¯é€‰) ===
 set "TG_TOKEN="
-set /p TG_TOKEN="Bot Token (°´ Enter Ìø¹ý): "
+set /p TG_TOKEN="Bot Token (æŒ‰ Enter è·³è¿‡): "
 if defined TG_TOKEN (
     set "TG_CHAT_ID="
     set /p TG_CHAT_ID="Chat ID: "
@@ -180,8 +186,8 @@ if defined TG_TOKEN (
 set "USER_DATA_DIR=%USERPROFILE%\.linuxdo-browser"
 
 (
-echo # LinuxDO Ç©µ½ÅäÖÃÎÄ¼þ
-echo # ÓÉÒ»¼ü°²×°½Å±¾×Ô¶¯Éú³É
+echo # LinuxDO ç­¾åˆ°é…ç½®æ–‡ä»¶
+echo # ç”±ä¸€é”®å®‰è£…è„šæœ¬è‡ªåŠ¨ç”Ÿæˆ
 echo.
 echo username: "%USERNAME%"
 echo password: "%PASSWORD%"
@@ -198,23 +204,23 @@ echo tg_chat_id: "%TG_CHAT_ID%"
 
 if not exist "%USER_DATA_DIR%" mkdir "%USER_DATA_DIR%"
 echo.
-echo [³É¹¦] ÅäÖÃÒÑ±£´æ: config.yaml
+echo [æˆåŠŸ] é…ç½®å·²ä¿å­˜: config.yaml
 goto :eof
 
 :edit_config
 if not exist "config.yaml" (
-    echo [¾¯¸æ] ÅäÖÃÎÄ¼þ²»´æÔÚ£¬ÇëÏÈÔËÐÐÒ»¼ü°²×°
+    echo [é”™è¯¯] é…ç½®æ–‡ä»¶ä¸å­˜åœ¨ï¼Œè¯·å…ˆè¿è¡Œä¸€é”®å®‰è£…
     pause
     goto :menu
 )
-echo [INFO] ´ò¿ªÅäÖÃÎÄ¼þ...
+echo [ä¿¡æ¯] æ‰“å¼€é…ç½®æ–‡ä»¶...
 notepad config.yaml
 goto :menu
 
 :setup_task
 echo.
 set "setup="
-set /p setup="ÊÇ·ñÉèÖÃ Windows ¶¨Ê±ÈÎÎñ£¿[y/N]: "
+set /p setup="æ˜¯å¦è®¾ç½® Windows å®šæ—¶ä»»åŠ¡ï¼Ÿ[y/N]: "
 if /i not "%setup%"=="y" goto :eof
 
 set "SCRIPT_DIR=%CD%"
@@ -222,12 +228,12 @@ set "PYTHON_PATH=%SCRIPT_DIR%\venv\Scripts\python.exe"
 set "MAIN_SCRIPT=%SCRIPT_DIR%\main.py"
 
 echo.
-echo Ñ¡ÔñÇ©µ½Ê±¼ä:
-echo   1. Ã¿Ìì 8:00 ºÍ 20:00£¨ÍÆ¼ö£©
-echo   2. Ã¿Ìì 9:00
-echo   3. ×Ô¶¨ÒåÊ±¼ä
+echo é€‰æ‹©ç­¾åˆ°æ—¶é—´:
+echo   1. æ¯å¤© 8:00 å’Œ 20:00ï¼ˆæŽ¨èï¼‰
+echo   2. æ¯å¤© 9:00
+echo   3. è‡ªå®šä¹‰æ—¶é—´
 set "time_choice="
-set /p time_choice="ÇëÑ¡Ôñ [1-3]: "
+set /p time_choice="è¯·é€‰æ‹© [1-3]: "
 
 schtasks /delete /tn "LinuxDO-Checkin-1" /f >nul 2>&1
 schtasks /delete /tn "LinuxDO-Checkin-2" /f >nul 2>&1
@@ -235,39 +241,39 @@ schtasks /delete /tn "LinuxDO-Checkin-2" /f >nul 2>&1
 if "%time_choice%"=="1" (
     schtasks /create /tn "LinuxDO-Checkin-1" /tr "\"%PYTHON_PATH%\" \"%MAIN_SCRIPT%\"" /sc daily /st 08:00 /f >nul
     schtasks /create /tn "LinuxDO-Checkin-2" /tr "\"%PYTHON_PATH%\" \"%MAIN_SCRIPT%\"" /sc daily /st 20:00 /f >nul
-    echo [³É¹¦] ¶¨Ê±ÈÎÎñÒÑÉèÖÃ: 08:00, 20:00
+    echo [æˆåŠŸ] å®šæ—¶ä»»åŠ¡å·²è®¾ç½®: 08:00, 20:00
 ) else if "%time_choice%"=="2" (
     schtasks /create /tn "LinuxDO-Checkin-1" /tr "\"%PYTHON_PATH%\" \"%MAIN_SCRIPT%\"" /sc daily /st 09:00 /f >nul
-    echo [³É¹¦] ¶¨Ê±ÈÎÎñÒÑÉèÖÃ: 09:00
+    echo [æˆåŠŸ] å®šæ—¶ä»»åŠ¡å·²è®¾ç½®: 09:00
 ) else (
     set "custom_time="
-    set /p custom_time="ÊäÈëÊ±¼ä (¸ñÊ½ HH:MM£¬Èç 08:00): "
+    set /p custom_time="è¾“å…¥æ—¶é—´ (æ ¼å¼ HH:MMï¼Œå¦‚ 08:00): "
     schtasks /create /tn "LinuxDO-Checkin-1" /tr "\"%PYTHON_PATH%\" \"%MAIN_SCRIPT%\"" /sc daily /st !custom_time! /f >nul
-    echo [³É¹¦] ¶¨Ê±ÈÎÎñÒÑÉèÖÃ: !custom_time!
+    echo [æˆåŠŸ] å®šæ—¶ä»»åŠ¡å·²è®¾ç½®: !custom_time!
 )
 
 echo.
-echo [ÌáÊ¾] ²é¿´ÈÎÎñ: schtasks /query /tn LinuxDO-Checkin-1
-echo [ÌáÊ¾] É¾³ýÈÎÎñ: schtasks /delete /tn LinuxDO-Checkin-1 /f
+echo [æç¤º] æŸ¥çœ‹ä»»åŠ¡: schtasks /query /tn LinuxDO-Checkin-1
+echo [æç¤º] åˆ é™¤ä»»åŠ¡: schtasks /delete /tn LinuxDO-Checkin-1 /f
 goto :eof
 
 :first_login
 echo.
 set "do_login="
-set /p do_login="ÊÇ·ñÏÖÔÚ½øÐÐÊ×´ÎµÇÂ¼£¿[Y/n]: "
+set /p do_login="æ˜¯å¦çŽ°åœ¨è¿›è¡Œé¦–æ¬¡ç™»å½•ï¼Ÿ[Y/n]: "
 if /i "%do_login%"=="n" goto :eof
 
 echo.
-echo [INFO] Æô¶¯ä¯ÀÀÆ÷½øÐÐÊ×´ÎµÇÂ¼...
-echo [ÌáÊ¾] ÇëÔÚä¯ÀÀÆ÷ÖÐµÇÂ¼ Linux.do ÕËºÅ
-echo [ÌáÊ¾] µÇÂ¼³É¹¦ºó¹Ø±Õä¯ÀÀÆ÷¼´¿É
+echo [ä¿¡æ¯] å¯åŠ¨æµè§ˆå™¨è¿›è¡Œé¦–æ¬¡ç™»å½•...
+echo [æç¤º] è¯·åœ¨æµè§ˆå™¨ä¸­ç™»å½• Linux.do è´¦å·
+echo [æç¤º] ç™»å½•æˆåŠŸåŽå…³é—­æµè§ˆå™¨å³å¯
 echo.
 venv\Scripts\python.exe main.py --first-login
 goto :eof
 
 :run_checkin
 echo.
-echo [INFO] ÔËÐÐÇ©µ½...
+echo [ä¿¡æ¯] è¿è¡Œç­¾åˆ°...
 venv\Scripts\python.exe main.py
 echo.
 pause
@@ -276,19 +282,19 @@ goto :menu
 :print_completion
 echo.
 echo ============================================================
-echo                      °²×°Íê³É£¡
+echo                      å®‰è£…å®Œæˆï¼
 echo ============================================================
 echo.
-echo ºóÐø²Ù×÷:
-echo   1. Ê×´ÎµÇÂ¼: venv\Scripts\python.exe main.py --first-login
-echo   2. ÔËÐÐÇ©µ½: venv\Scripts\python.exe main.py
-echo   3. ±à¼­ÅäÖÃ: Ñ¡Ôñ²Ëµ¥ 3 »òÖ±½Ó±à¼­ config.yaml
-echo   4. ²é¿´ÈÎÎñ: schtasks /query /tn LinuxDO-Checkin-1
+echo åŽç»­æ“ä½œ:
+echo   1. é¦–æ¬¡ç™»å½•: venv\Scripts\python.exe main.py --first-login
+echo   2. è¿è¡Œç­¾åˆ°: venv\Scripts\python.exe main.py
+echo   3. ç¼–è¾‘é…ç½®: é€‰æ‹©èœå• 3 æˆ–ç›´æŽ¥ç¼–è¾‘ config.yaml
+echo   4. æŸ¥çœ‹ä»»åŠ¡: schtasks /query /tn LinuxDO-Checkin-1
 echo.
 goto :eof
 
 :exit_script
 echo.
-echo °´ÈÎÒâ¼üÍË³ö...
+echo æ„Ÿè°¢ä½¿ç”¨ï¼Œå†è§ï¼
 pause >nul
 exit /b 0

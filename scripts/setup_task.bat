@@ -1,13 +1,11 @@
 @echo off
-chcp 65001 >nul
-echo ========================================
-echo LinuxDO 签到 - Windows 定时任务设置
-echo ========================================
-echo.
+chcp 65001 >nul 2>&1
+setlocal enabledelayedexpansion
 
 :: 获取脚本所在目录
 set SCRIPT_DIR=%~dp0
 set PROJECT_DIR=%SCRIPT_DIR%..
+cd /d "%PROJECT_DIR%"
 
 :: 检查 Python
 python --version >nul 2>&1
@@ -17,19 +15,26 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [信息] 项目目录: %PROJECT_DIR%
+echo.
+echo +--------------------------------------------+
+echo ^|   LinuxDO 签到 - Windows 定时任务设置     ^|
+echo +--------------------------------------------+
+echo ^| 项目目录     ^| %CD:~0,24%   ^|
+echo +--------------------------------------------+
 echo.
 
 :menu
-:: 选择操作
-echo 请选择操作：
-echo   1. 创建定时任务（自定义时间和次数）
-echo   2. 删除定时任务
-echo   3. 查看定时任务
-echo   4. 立即运行签到
-echo   5. 首次登录（保存登录状态）
-echo   6. 测试 Telegram 提醒
-echo   7. 退出
+echo +--------------------------------------------+
+echo ^|                主菜单                      ^|
+echo +--------------------------------------------+
+echo ^|  1. 创建定时任务（自定义时间和次数）       ^|
+echo ^|  2. 删除定时任务                           ^|
+echo ^|  3. 查看定时任务                           ^|
+echo ^|  4. 立即运行签到                           ^|
+echo ^|  5. 首次登录（保存登录状态）               ^|
+echo ^|  6. 测试 Telegram 提醒                     ^|
+echo ^|  7. 退出                                   ^|
+echo +--------------------------------------------+
 echo.
 set /p choice=请输入选项 (1-7):
 

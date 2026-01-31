@@ -13,25 +13,28 @@ PLIST_DIR="$HOME/Library/LaunchAgents"
 # Python 路径
 PYTHON_PATH=$(which python3 || which python)
 
-echo "========================================"
-echo "LinuxDO 签到 - macOS 定时任务设置"
-echo "========================================"
-echo ""
-echo "项目目录: $PROJECT_DIR"
-echo "Python: $PYTHON_PATH"
+echo "┌──────────────────────────────────────────┐"
+echo "│   LinuxDO 签到 - macOS 定时任务设置    │"
+echo "├──────────────────────────────────────────┤"
+printf "│ 项目目录     │ %-22s │\n" "${PROJECT_DIR:0:22}"
+printf "│ Python       │ %-22s │\n" "${PYTHON_PATH:0:22}"
+echo "└──────────────────────────────────────────┘"
 echo ""
 
 # 显示菜单
 show_menu() {
-    echo "请选择操作："
-    echo "  1. 创建定时任务（自定义时间和次数）"
-    echo "  2. 删除定时任务"
-    echo "  3. 查看任务状态"
-    echo "  4. 立即运行签到"
-    echo "  5. 首次登录（保存登录状态）"
-    echo "  6. 测试 Telegram 提醒"
-    echo "  7. 查看日志"
-    echo "  8. 退出"
+    echo "┌──────────────────────────────────────────┐"
+    echo "│                主菜单                    │"
+    echo "├──────────────────────────────────────────┤"
+    echo "│  1. 创建定时任务（自定义时间和次数）     │"
+    echo "│  2. 删除定时任务                         │"
+    echo "│  3. 查看任务状态                         │"
+    echo "│  4. 立即运行签到                         │"
+    echo "│  5. 首次登录（保存登录状态）             │"
+    echo "│  6. 测试 Telegram 提醒                   │"
+    echo "│  7. 查看日志                             │"
+    echo "│  8. 退出                                 │"
+    echo "└──────────────────────────────────────────┘"
     echo ""
     read -p "请输入选项 (1-8): " choice
 }
