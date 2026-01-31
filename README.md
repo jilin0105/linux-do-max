@@ -8,6 +8,7 @@
 - [签到流程](#签到流程)
 - [功能特性](#功能特性)
 - [支持平台](#支持平台)
+- [一键安装](#一键安装)
 - [快速开始](#快速开始)
 - [方案详解](#方案详解)
   - [方案A：Windows 任务计划](#方案awindows-任务计划)
@@ -161,6 +162,127 @@
 - 服务器：Linux / Docker 方案
 - 已有青龙面板：青龙方案
 - 树莓派/ARM 服务器：ARM 设备方案
+
+---
+
+## 一键安装
+
+**推荐使用一键安装脚本**，自动检测系统平台、安装依赖、配置环境、设置定时任务。
+
+### Linux / macOS / ARM
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/xtgm/linux-do-max.git
+cd linux-do-max
+
+# 2. 运行一键安装脚本
+chmod +x install.sh
+./install.sh
+```
+
+脚本会自动：
+- 检测操作系统和架构（x64/ARM64/ARM32）
+- 检测 Linux 发行版（Debian/Ubuntu/CentOS/Fedora/Arch/Alpine）
+- 检测是否为树莓派/电视盒子等 ARM 设备
+- 检测是否有图形界面
+- 安装系统依赖（Python、Chromium、Xvfb、中文字体）
+- 创建 Python 虚拟环境并安装依赖
+- 交互式配置（用户名、密码、Telegram、浏览设置）
+- 设置定时任务（cron / launchd）
+- 引导首次登录
+
+### Windows
+
+```powershell
+# 1. 克隆项目
+git clone https://github.com/xtgm/linux-do-max.git
+cd linux-do-max
+
+# 2. 运行一键安装脚本（PowerShell）
+.\install.ps1
+```
+
+脚本会自动：
+- 检测 Python 和 Chrome 是否已安装
+- 创建 Python 虚拟环境并安装依赖
+- 交互式配置
+- 设置 Windows 任务计划
+- 引导首次登录
+
+### 一键安装流程
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    一键安装流程                              │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. 系统检测                                                │
+│     ├── 操作系统 (Linux/macOS/Windows)                      │
+│     ├── 架构 (x64/ARM64/ARM32)                              │
+│     ├── 发行版 (Debian/Ubuntu/CentOS/Fedora/Arch/Alpine)    │
+│     ├── 包管理器 (apt/dnf/yum/pacman/apk/brew)              │
+│     ├── 是否为 ARM 设备 (树莓派/电视盒子)                    │
+│     └── 是否有图形界面                                       │
+│                                                             │
+│  2. 安装依赖                                                │
+│     ├── Python 3.8+                                         │
+│     ├── Chromium / Chrome                                   │
+│     ├── Xvfb (Linux 无头模式)                               │
+│     └── 中文字体                                            │
+│                                                             │
+│  3. Python 环境                                             │
+│     ├── 创建虚拟环境 (venv)                                 │
+│     ├── 升级 pip                                            │
+│     └── 安装 requirements.txt                               │
+│                                                             │
+│  4. 交互式配置                                              │
+│     ├── Linux.do 用户名/密码（可选）                        │
+│     ├── 浏览帖子数量                                        │
+│     ├── 点赞概率                                            │
+│     ├── 无头模式                                            │
+│     ├── Telegram 通知配置                                   │
+│     └── 生成 config.yaml                                    │
+│                                                             │
+│  5. 定时任务                                                │
+│     ├── Linux: cron                                         │
+│     ├── macOS: launchd                                      │
+│     └── Windows: 任务计划程序                               │
+│                                                             │
+│  6. 首次登录                                                │
+│     ├── 有图形界面: 直接运行                                │
+│     └── 无图形界面: 提示 VNC/X11/方案四                     │
+│                                                             │
+│  7. 测试运行                                                │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 安装脚本参数
+
+**Linux/macOS (install.sh):**
+```bash
+# 直接运行（交互式）
+./install.sh
+
+# 查看帮助
+./install.sh --help
+```
+
+**Windows (install.ps1):**
+```powershell
+# 直接运行（交互式）
+.\install.ps1
+
+# 跳过配置
+.\install.ps1 -SkipConfig
+
+# 跳过定时任务
+.\install.ps1 -SkipCron
+
+# 查看帮助
+.\install.ps1 -Help
+```
 
 ---
 
