@@ -25,6 +25,15 @@ import re
 from pathlib import Path
 from typing import Optional, Dict, Any
 
+# Windows 控制台编码设置
+if sys.platform == "win32":
+    # 设置控制台代码页为 UTF-8
+    os.system("chcp 65001 >nul 2>&1")
+    # 设置标准输出编码
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+
 # ============================================================
 # 版本信息
 # ============================================================

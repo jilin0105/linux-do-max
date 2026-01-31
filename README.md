@@ -191,14 +191,21 @@ chmod +x linuxANDmacos.sh
 ./linuxANDmacos.sh
 ```
 
-### Python 版本（全平台通用）
+### Python 版本（全平台通用，功能最完整）
+
+需要先安装 Python 3.8+
 
 ```bash
+# 方式一：在脚本目录运行
 cd 一键安装脚本点这里
 python install.py
-```
 
-**优点**：功能最完整，配置编辑更方便，支持所有平台。
+# 方式二：在项目根目录运行
+cd E:\linuxdo-checkin
+python 一键安装脚本点这里\install.py
+
+# 方式三：直接双击 install.py（需要 Python 已关联 .py 文件）
+```
 
 ### 脚本功能
 
