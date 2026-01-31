@@ -104,29 +104,29 @@ install_deps() {
     case "$PKG_MGR" in
         apt)
             sudo apt-get update
-            sudo apt-get install -y python3 python3-pip python3-venv \
+            sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
                 chromium-browser xvfb fonts-wqy-zenhei \
                 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
                 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
                 libxrandr2 libgbm1 libasound2 2>/dev/null || \
-            sudo apt-get install -y python3 python3-pip python3-venv \
+            sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
                 chromium xvfb fonts-wqy-zenhei 2>/dev/null || true
             ;;
         dnf)
-            sudo dnf install -y python3 python3-pip chromium chromedriver \
-                xorg-x11-server-Xvfb wqy-zenhei-fonts || true
+            sudo dnf install -y python3 python3-pip python3-virtualenv python3-devel || true
+            sudo dnf install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts || true
             ;;
         yum)
-            sudo yum install -y python3 python3-pip chromium chromedriver \
-                xorg-x11-server-Xvfb wqy-zenhei-fonts || true
+            sudo yum install -y python3 python3-pip python3-virtualenv python3-devel || true
+            sudo yum install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts || true
             ;;
         pacman)
-            sudo pacman -Syu --noconfirm python python-pip chromium \
-                xorg-server-xvfb wqy-zenhei || true
+            sudo pacman -Syu --noconfirm python python-pip python-virtualenv || true
+            sudo pacman -Syu --noconfirm chromium xorg-server-xvfb wqy-zenhei || true
             ;;
         apk)
-            sudo apk add python3 py3-pip chromium chromium-chromedriver \
-                xvfb font-wqy-zenhei ttf-wqy-zenhei || true
+            sudo apk add python3 py3-pip py3-virtualenv || true
+            sudo apk add chromium chromium-chromedriver xvfb font-wqy-zenhei ttf-wqy-zenhei || true
             ;;
         brew)
             brew install python3 || true
@@ -134,7 +134,7 @@ install_deps() {
                 print_warning "请手动安装 Chrome: https://www.google.com/chrome/"
             ;;
         *)
-            print_warning "未知包管理器，请手动安装: Python3, Chromium, Xvfb"
+            print_warning "未知包管理器，请手动安装: Python3, pip, venv, Chromium, Xvfb"
             ;;
     esac
 
