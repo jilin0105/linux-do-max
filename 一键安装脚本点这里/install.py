@@ -518,32 +518,39 @@ class DependencyInstaller:
             self._run_cmd("sudo apt-get update")
             for pkg in packages:
                 self._run_cmd(f"sudo apt-get install -y {pkg}", ignore_error=True)
+            # 刷新字体缓存
+            self._run_cmd("fc-cache -fv", ignore_error=True)
 
         elif pkg_manager == "dnf":
             print_info("使用 dnf 安装依赖...")
             self._run_cmd("sudo dnf install -y python3 python3-pip python3-virtualenv python3-devel", ignore_error=True)
-            self._run_cmd("sudo dnf install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts", ignore_error=True)
+            self._run_cmd("sudo dnf install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts", ignore_error=True)
+            self._run_cmd("fc-cache -fv", ignore_error=True)
 
         elif pkg_manager == "yum":
             print_info("使用 yum 安装依赖...")
             self._run_cmd("sudo yum install -y python3 python3-pip python3-virtualenv python3-devel", ignore_error=True)
-            self._run_cmd("sudo yum install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts", ignore_error=True)
+            self._run_cmd("sudo yum install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts", ignore_error=True)
+            self._run_cmd("fc-cache -fv", ignore_error=True)
 
         elif pkg_manager == "pacman":
             print_info("使用 pacman 安装依赖...")
             self._run_cmd("sudo pacman -Syu --noconfirm python python-pip python-virtualenv", ignore_error=True)
-            self._run_cmd("sudo pacman -Syu --noconfirm chromium xorg-server-xvfb wqy-zenhei", ignore_error=True)
+            self._run_cmd("sudo pacman -Syu --noconfirm chromium xorg-server-xvfb wqy-zenhei wqy-microhei", ignore_error=True)
+            self._run_cmd("fc-cache -fv", ignore_error=True)
 
         elif pkg_manager == "apk":
             print_info("使用 apk 安装依赖...")
             # Alpine: python3-dev 包含 venv 模块
             self._run_cmd("sudo apk add python3 py3-pip python3-dev", ignore_error=True)
-            self._run_cmd("sudo apk add chromium chromium-chromedriver xvfb font-wqy-zenhei ttf-wqy-zenhei", ignore_error=True)
+            self._run_cmd("sudo apk add chromium chromium-chromedriver xvfb font-wqy-zenhei ttf-wqy-zenhei font-noto-cjk", ignore_error=True)
+            self._run_cmd("fc-cache -fv", ignore_error=True)
 
         elif pkg_manager == "zypper":
             print_info("使用 zypper 安装依赖...")
             self._run_cmd("sudo zypper install -y python3 python3-pip python3-virtualenv python3-devel", ignore_error=True)
             self._run_cmd("sudo zypper install -y chromium xvfb-run google-noto-sans-cjk-fonts", ignore_error=True)
+            self._run_cmd("fc-cache -fv", ignore_error=True)
 
         else:
             print_warning(f"未知包管理器: {pkg_manager}")

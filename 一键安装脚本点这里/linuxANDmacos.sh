@@ -106,33 +106,40 @@ install_deps() {
         apt)
             sudo apt-get update
             sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
-                chromium-browser xvfb fonts-wqy-zenhei \
+                chromium-browser xvfb fonts-wqy-zenhei fonts-wqy-microhei \
                 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 \
                 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
                 libxrandr2 libgbm1 libasound2 2>/dev/null || \
             sudo apt-get install -y python3 python3-pip python3-venv python3-dev \
-                chromium xvfb fonts-wqy-zenhei 2>/dev/null || true
+                chromium xvfb fonts-wqy-zenhei fonts-wqy-microhei 2>/dev/null || true
+            # 刷新字体缓存
+            fc-cache -fv 2>/dev/null || true
             ;;
         dnf)
             sudo dnf install -y python3 python3-pip python3-virtualenv python3-devel || true
-            sudo dnf install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts || true
+            sudo dnf install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts || true
+            fc-cache -fv 2>/dev/null || true
             ;;
         yum)
             sudo yum install -y python3 python3-pip python3-virtualenv python3-devel || true
-            sudo yum install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts || true
+            sudo yum install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts || true
+            fc-cache -fv 2>/dev/null || true
             ;;
         pacman)
             sudo pacman -Syu --noconfirm python python-pip python-virtualenv || true
-            sudo pacman -Syu --noconfirm chromium xorg-server-xvfb wqy-zenhei || true
+            sudo pacman -Syu --noconfirm chromium xorg-server-xvfb wqy-zenhei wqy-microhei || true
+            fc-cache -fv 2>/dev/null || true
             ;;
         apk)
             # Alpine: python3-dev 包含 venv 模块
             sudo apk add python3 py3-pip python3-dev || true
-            sudo apk add chromium chromium-chromedriver xvfb font-wqy-zenhei ttf-wqy-zenhei || true
+            sudo apk add chromium chromium-chromedriver xvfb font-wqy-zenhei ttf-wqy-zenhei font-noto-cjk || true
+            fc-cache -fv 2>/dev/null || true
             ;;
         zypper)
             sudo zypper install -y python3 python3-pip python3-virtualenv python3-devel || true
             sudo zypper install -y chromium xvfb-run google-noto-sans-cjk-fonts || true
+            fc-cache -fv 2>/dev/null || true
             ;;
         brew)
             brew install python3 || true
