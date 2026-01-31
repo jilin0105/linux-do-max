@@ -1,16 +1,7 @@
-: << 'BATCH_SCRIPT'
-@echo off
-goto :windows
-BATCH_SCRIPT
-
 #!/bin/bash
 # ============================================================
-# LinuxDO 签到 - 一键安装脚本 (Polyglot)
-# 此脚本在 Windows 上作为 .cmd 运行，在 Linux/macOS 上作为 bash 运行
-#
-# 使用方法:
-#   Windows: 双击 install.cmd 或在命令行运行 install.cmd
-#   Linux/macOS: chmod +x install.cmd && ./install.cmd
+# LinuxDO 签到 - Linux/macOS 一键安装脚本
+# 使用方法: chmod +x install.sh && ./install.sh
 # ============================================================
 
 set -e
@@ -37,6 +28,10 @@ print_info() { echo -e "${BLUE}[信息]${NC} $1"; }
 print_success() { echo -e "${GREEN}[成功]${NC} $1"; }
 print_warning() { echo -e "${YELLOW}[警告]${NC} $1"; }
 print_error() { echo -e "${RED}[错误]${NC} $1"; }
+
+# 自动切换到项目根目录
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
 
 # 检测系统
 detect_system() {
@@ -170,7 +165,9 @@ interactive_config() {
         [ "$RECONFIG" != "y" ] && [ "$RECONFIG" != "Y" ] && return
     fi
 
-    read -p "Linux.do 用户名 (可选): " USERNAME
+    echo ""
+    echo "=== 基本配置 ==="
+    read -p "Linux.do 用户名 (可选，按 Enter 跳过): " USERNAME
     [ -n "$USERNAME" ] && read -p "Linux.do 密码 (可选): " PASSWORD
 
     read -p "浏览帖子数量 [10]: " BROWSE_COUNT
@@ -188,8 +185,8 @@ interactive_config() {
     HEADLESS=${HEADLESS:-$HEADLESS_DEFAULT}
 
     echo ""
-    echo "Telegram 通知配置（可选）:"
-    read -p "Bot Token (直接回车跳过): " TG_TOKEN
+    echo "=== Telegram 通知 (可选) ==="
+    read -p "Bot Token (按 Enter 跳过): " TG_TOKEN
     [ -n "$TG_TOKEN" ] && read -p "Chat ID: " TG_CHAT_ID
 
     USER_DATA_DIR="$HOME/.linuxdo-browser"
@@ -198,7 +195,8 @@ interactive_config() {
 
     # 检测浏览器
     BROWSER_PATH=""
-    for p in /usr/bin/chromium-browser /usr/bin/chromium /usr/bin/google-chrome; do
+    for p in /usr/bin/chromium-browser /usr/bin/chromium /usr/bin/google-chrome \
+             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; do
         [ -x "$p" ] && BROWSER_PATH="$p" && break
     done
 
@@ -229,21 +227,31 @@ setup_cron() {
     read -p "是否设置定时任务？[y/N]: " SETUP
     [ "$SETUP" != "y" ] && [ "$SETUP" != "Y" ] && return
 
-    SCRIPT_DIR=$(pwd)
-    PYTHON_PATH="$SCRIPT_DIR/venv/bin/python"
+    PROJECT_DIR=$(pwd)
+    PYTHON_PATH="$PROJECT_DIR/venv/bin/python"
+
+    echo ""
+    echo "选择签到时间:"
+    echo "  1. 每天 8:00 和 20:00（推荐）"
+    echo "  2. 每天 9:00"
+    echo "  3. 自定义时间"
+    read -p "请选择 [1-3]: " time_choice
 
     if [ "$OS_NAME" = "macOS" ]; then
         # macOS launchd
         PLIST="$HOME/Library/LaunchAgents/com.linuxdo.checkin.plist"
-        cat > "$PLIST" << EOF
+
+        case $time_choice in
+            1)
+                cat > "$PLIST" << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key><string>com.linuxdo.checkin</string>
     <key>ProgramArguments</key>
-    <array><string>$PYTHON_PATH</string><string>$SCRIPT_DIR/main.py</string></array>
-    <key>WorkingDirectory</key><string>$SCRIPT_DIR</string>
+    <array><string>$PYTHON_PATH</string><string>$PROJECT_DIR/main.py</string></array>
+    <key>WorkingDirectory</key><string>$PROJECT_DIR</string>
     <key>StartCalendarInterval</key>
     <array>
         <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
@@ -252,15 +260,81 @@ setup_cron() {
 </dict>
 </plist>
 EOF
+                ;;
+            2)
+                cat > "$PLIST" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>com.linuxdo.checkin</string>
+    <key>ProgramArguments</key>
+    <array><string>$PYTHON_PATH</string><string>$PROJECT_DIR/main.py</string></array>
+    <key>WorkingDirectory</key><string>$PROJECT_DIR</string>
+    <key>StartCalendarInterval</key>
+    <dict><key>Hour</key><integer>9</integer><key>Minute</key><integer>0</integer></dict>
+</dict>
+</plist>
+EOF
+                ;;
+            3)
+                read -p "输入时间 (格式 HH:MM，如 08:00): " custom_time
+                HOUR=$(echo "$custom_time" | cut -d: -f1 | sed 's/^0//')
+                MINUTE=$(echo "$custom_time" | cut -d: -f2 | sed 's/^0//')
+                cat > "$PLIST" << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>com.linuxdo.checkin</string>
+    <key>ProgramArguments</key>
+    <array><string>$PYTHON_PATH</string><string>$PROJECT_DIR/main.py</string></array>
+    <key>WorkingDirectory</key><string>$PROJECT_DIR</string>
+    <key>StartCalendarInterval</key>
+    <dict><key>Hour</key><integer>$HOUR</integer><key>Minute</key><integer>$MINUTE</integer></dict>
+</dict>
+</plist>
+EOF
+                ;;
+        esac
+
         launchctl unload "$PLIST" 2>/dev/null || true
         launchctl load "$PLIST"
         print_success "macOS 定时任务已设置"
+        echo "[提示] 查看任务: launchctl list | grep linuxdo"
+        echo "[提示] 删除任务: launchctl unload $PLIST"
     else
         # Linux cron
-        mkdir -p "$SCRIPT_DIR/logs"
-        CRON_CMD="0 8,20 * * * cd $SCRIPT_DIR && xvfb-run -a $PYTHON_PATH main.py >> logs/checkin.log 2>&1"
-        (crontab -l 2>/dev/null | grep -v "linuxdo"; echo "# LinuxDO签到"; echo "$CRON_CMD") | crontab -
+        mkdir -p "$PROJECT_DIR/logs"
+
+        # 移除旧的 cron 任务
+        crontab -l 2>/dev/null | grep -v "linuxdo" | grep -v "LinuxDO" > /tmp/crontab.tmp || true
+
+        case $time_choice in
+            1)
+                echo "# LinuxDO签到 - 08:00" >> /tmp/crontab.tmp
+                echo "0 8 * * * cd $PROJECT_DIR && xvfb-run -a $PYTHON_PATH main.py >> logs/checkin.log 2>&1" >> /tmp/crontab.tmp
+                echo "# LinuxDO签到 - 20:00" >> /tmp/crontab.tmp
+                echo "0 20 * * * cd $PROJECT_DIR && xvfb-run -a $PYTHON_PATH main.py >> logs/checkin.log 2>&1" >> /tmp/crontab.tmp
+                ;;
+            2)
+                echo "# LinuxDO签到 - 09:00" >> /tmp/crontab.tmp
+                echo "0 9 * * * cd $PROJECT_DIR && xvfb-run -a $PYTHON_PATH main.py >> logs/checkin.log 2>&1" >> /tmp/crontab.tmp
+                ;;
+            3)
+                read -p "输入时间 (格式 HH:MM，如 08:00): " custom_time
+                HOUR=$(echo "$custom_time" | cut -d: -f1 | sed 's/^0//')
+                MINUTE=$(echo "$custom_time" | cut -d: -f2 | sed 's/^0//')
+                echo "# LinuxDO签到 - $custom_time" >> /tmp/crontab.tmp
+                echo "$MINUTE $HOUR * * * cd $PROJECT_DIR && xvfb-run -a $PYTHON_PATH main.py >> logs/checkin.log 2>&1" >> /tmp/crontab.tmp
+                ;;
+        esac
+
+        crontab /tmp/crontab.tmp
+        rm /tmp/crontab.tmp
         print_success "Linux 定时任务已设置"
+        echo "[提示] 查看任务: crontab -l"
+        echo "[提示] 编辑任务: crontab -e"
     fi
 }
 
@@ -274,14 +348,16 @@ first_login() {
         echo "  方式1: VNC 远程桌面"
         echo "    sudo apt install tigervnc-standalone-server"
         echo "    vncserver :1"
+        echo "    export DISPLAY=:1"
         echo ""
         echo "  方式2: SSH X11 转发"
         echo "    ssh -X user@host"
         echo "    export DISPLAY=localhost:10.0"
         echo ""
         echo "  方式3: 在其他电脑完成首次登录"
-        echo "    1) 在有图形界面的电脑上运行首次登录"
-        echo "    2) 将 ~/.linuxdo-browser 目录复制到本机"
+        echo "    1) 在有图形界面的电脑上运行: python main.py --first-login"
+        echo "    2) 将 ~/.linuxdo-browser 目录复制到本机相同位置"
+        echo "    3) 设置 headless: true 后运行签到"
         echo ""
         read -p "按 Enter 继续..."
         return
@@ -290,43 +366,14 @@ first_login() {
     read -p "是否现在进行首次登录？[Y/n]: " DO_LOGIN
     [ "$DO_LOGIN" = "n" ] || [ "$DO_LOGIN" = "N" ] && return
 
+    echo ""
+    print_info "启动浏览器进行首次登录..."
+    echo "[提示] 请在浏览器中登录 Linux.do 账号"
+    echo "[提示] 登录成功后关闭浏览器即可"
+    echo ""
+
     source venv/bin/activate
     python main.py --first-login
-}
-
-# 主菜单
-main_menu() {
-    while true; do
-        echo ""
-        echo "┌─────────────────────────────────────────┐"
-        echo "│              主菜单                     │"
-        echo "├─────────────────────────────────────────┤"
-        echo "│  1. 一键安装（推荐）                    │"
-        echo "│  2. 仅安装依赖                          │"
-        echo "│  3. 仅配置 Python 环境                  │"
-        echo "│  4. 编辑配置文件                        │"
-        echo "│  5. 设置定时任务                        │"
-        echo "│  6. 首次登录                            │"
-        echo "│  7. 运行签到                            │"
-        echo "│  8. 查看系统信息                        │"
-        echo "│  0. 退出                                │"
-        echo "└─────────────────────────────────────────┘"
-        echo ""
-        read -p "请选择 [0-8]: " choice
-
-        case $choice in
-            0) exit 0 ;;
-            1) install_deps; setup_python; interactive_config; setup_cron; first_login; print_completion ;;
-            2) install_deps ;;
-            3) setup_python ;;
-            4) edit_config ;;
-            5) setup_cron ;;
-            6) first_login ;;
-            7) run_checkin ;;
-            8) detect_system ;;
-            *) print_error "无效选项" ;;
-        esac
-    done
 }
 
 # 编辑配置
@@ -368,7 +415,7 @@ edit_config() {
             7) read -p "TG Token: " val; sed -i "s/^tg_bot_token:.*/tg_bot_token: \"$val\"/" config.yaml ;;
             8) read -p "TG Chat ID: " val; sed -i "s/^tg_chat_id:.*/tg_chat_id: \"$val\"/" config.yaml ;;
         esac
-        print_success "配置已更新"
+        [ "$opt" != "0" ] && print_success "配置已更新"
     done
 }
 
@@ -394,9 +441,44 @@ print_completion() {
     echo "后续操作:"
     echo "  1. 首次登录: ./venv/bin/python main.py --first-login"
     echo "  2. 运行签到: ./venv/bin/python main.py"
-    echo "  3. 编辑配置: ./install.cmd 选择 4"
+    echo "  3. 编辑配置: ./install.sh 选择 4"
     echo "  4. 查看日志: tail -f logs/checkin.log"
     echo ""
+}
+
+# 主菜单
+main_menu() {
+    while true; do
+        echo ""
+        echo "┌─────────────────────────────────────────┐"
+        echo "│              主菜单                     │"
+        echo "├─────────────────────────────────────────┤"
+        echo "│  1. 一键安装（推荐）                    │"
+        echo "│  2. 仅安装依赖                          │"
+        echo "│  3. 仅配置 Python 环境                  │"
+        echo "│  4. 编辑配置文件                        │"
+        echo "│  5. 设置定时任务                        │"
+        echo "│  6. 首次登录                            │"
+        echo "│  7. 运行签到                            │"
+        echo "│  8. 查看系统信息                        │"
+        echo "│  0. 退出                                │"
+        echo "└─────────────────────────────────────────┘"
+        echo ""
+        read -p "请选择 [0-8]: " choice
+
+        case $choice in
+            0) exit 0 ;;
+            1) install_deps; setup_python; interactive_config; setup_cron; first_login; print_completion ;;
+            2) install_deps ;;
+            3) setup_python ;;
+            4) edit_config ;;
+            5) setup_cron ;;
+            6) first_login ;;
+            7) run_checkin ;;
+            8) detect_system ;;
+            *) print_error "无效选项" ;;
+        esac
+    done
 }
 
 # 主入口
@@ -413,235 +495,3 @@ main() {
 }
 
 main "$@"
-exit 0
-
-:windows
-@echo off
-setlocal enabledelayedexpansion
-chcp 65001 >nul 2>&1
-
-set "VERSION=1.2.0"
-
-echo.
-echo ╔════════════════════════════════════════════════════════════╗
-echo ║     LinuxDO 签到一键安装脚本 v%VERSION%     ║
-echo ╚════════════════════════════════════════════════════════════╝
-echo.
-
-:: 检测系统
-echo [信息] 检测系统环境...
-echo.
-echo ┌─────────────────────────────────────────┐
-echo │           系统环境检测结果              │
-echo ├─────────────────────────────────────────┤
-
-for /f "tokens=2 delims==" %%a in ('wmic os get caption /value') do set "OS_NAME=%%a"
-for /f "tokens=2 delims==" %%a in ('wmic os get osarchitecture /value') do set "ARCH=%%a"
-
-echo │ 操作系统     │ Windows                   │
-echo │ 架构         │ %ARCH%                    │
-
-:: 检测 Python
-set "PYTHON_OK=0"
-where python >nul 2>&1 && set "PYTHON_OK=1"
-if %PYTHON_OK%==1 (
-    echo │ Python       │ 已安装                    │
-) else (
-    echo │ Python       │ 未安装                    │
-)
-
-:: 检测 Chrome
-set "CHROME_PATH="
-if exist "%ProgramFiles%\Google\Chrome\Application\chrome.exe" set "CHROME_PATH=%ProgramFiles%\Google\Chrome\Application\chrome.exe"
-if exist "%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe" set "CHROME_PATH=%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"
-if exist "%LocalAppData%\Google\Chrome\Application\chrome.exe" set "CHROME_PATH=%LocalAppData%\Google\Chrome\Application\chrome.exe"
-
-if defined CHROME_PATH (
-    echo │ Chrome       │ 已安装                    │
-) else (
-    echo │ Chrome       │ 未安装                    │
-)
-echo └─────────────────────────────────────────┘
-echo.
-
-:: 检查依赖
-if %PYTHON_OK%==0 (
-    echo [错误] 未检测到 Python
-    echo [信息] 请从 https://www.python.org/downloads/ 下载安装
-    echo [信息] 安装时请勾选 "Add Python to PATH"
-    pause
-    exit /b 1
-)
-
-if not defined CHROME_PATH (
-    echo [警告] 未检测到 Chrome
-    echo [信息] 请从 https://www.google.com/chrome/ 下载安装
-)
-
-:: 检查项目文件
-if not exist "main.py" (
-    if not exist "requirements.txt" (
-        echo [错误] 请在项目目录下运行此脚本
-        pause
-        exit /b 1
-    )
-)
-
-:menu
-echo.
-echo ┌─────────────────────────────────────────┐
-echo │              主菜单                     │
-echo ├─────────────────────────────────────────┤
-echo │  1. 一键安装（推荐）                    │
-echo │  2. 仅配置 Python 环境                  │
-echo │  3. 编辑配置文件                        │
-echo │  4. 设置定时任务                        │
-echo │  5. 首次登录                            │
-echo │  6. 运行签到                            │
-echo │  0. 退出                                │
-echo └─────────────────────────────────────────┘
-echo.
-set /p choice="请选择 [0-6]: "
-
-if "%choice%"=="0" exit /b 0
-if "%choice%"=="1" goto :full_install
-if "%choice%"=="2" goto :setup_python
-if "%choice%"=="3" goto :edit_config
-if "%choice%"=="4" goto :setup_task
-if "%choice%"=="5" goto :first_login
-if "%choice%"=="6" goto :run_checkin
-echo [错误] 无效选项
-goto :menu
-
-:full_install
-call :setup_python
-call :interactive_config
-call :setup_task
-call :first_login
-call :print_completion
-goto :menu
-
-:setup_python
-echo [信息] 配置 Python 环境...
-if not exist "venv" (
-    echo [信息] 创建虚拟环境...
-    python -m venv venv
-)
-echo [信息] 升级 pip...
-venv\Scripts\python.exe -m pip install --upgrade pip >nul 2>&1
-echo [信息] 安装依赖...
-venv\Scripts\pip.exe install -r requirements.txt
-echo [成功] Python 环境配置完成
-goto :eof
-
-:interactive_config
-echo [信息] 配置向导...
-echo.
-
-if exist "config.yaml" (
-    echo [警告] 检测到已有配置文件
-    set /p reconfig="是否重新配置？[y/N]: "
-    if /i not "!reconfig!"=="y" goto :eof
-)
-
-set /p USERNAME="Linux.do 用户名 (可选): "
-if defined USERNAME set /p PASSWORD="Linux.do 密码 (可选): "
-
-set /p BROWSE_COUNT="浏览帖子数量 [10]: "
-if not defined BROWSE_COUNT set "BROWSE_COUNT=10"
-
-set /p LIKE_PROB="点赞概率 (0-1) [0.3]: "
-if not defined LIKE_PROB set "LIKE_PROB=0.3"
-
-set /p HEADLESS="无头模式 (true/false) [false]: "
-if not defined HEADLESS set "HEADLESS=false"
-
-echo.
-echo Telegram 通知配置（可选）:
-set /p TG_TOKEN="Bot Token (直接回车跳过): "
-if defined TG_TOKEN set /p TG_CHAT_ID="Chat ID: "
-
-set "USER_DATA_DIR=%USERPROFILE%\.linuxdo-browser"
-
-:: 生成配置文件
-(
-echo # LinuxDO 签到配置文件
-echo.
-echo username: "%USERNAME%"
-echo password: "%PASSWORD%"
-echo user_data_dir: "%USER_DATA_DIR:\=/%"
-echo headless: %HEADLESS%
-echo browser_path: "%CHROME_PATH:\=/%"
-echo browse_count: %BROWSE_COUNT%
-echo like_probability: %LIKE_PROB%
-echo browse_interval_min: 3
-echo browse_interval_max: 8
-echo tg_bot_token: "%TG_TOKEN%"
-echo tg_chat_id: "%TG_CHAT_ID%"
-) > config.yaml
-
-if not exist "%USER_DATA_DIR%" mkdir "%USER_DATA_DIR%"
-echo [成功] 配置已保存: config.yaml
-goto :eof
-
-:edit_config
-if not exist "config.yaml" (
-    echo [警告] 配置文件不存在，请先运行一键安装
-    goto :menu
-)
-echo [信息] 打开配置文件...
-notepad config.yaml
-goto :menu
-
-:setup_task
-set /p setup="是否设置定时任务？[y/N]: "
-if /i not "%setup%"=="y" goto :eof
-
-set "SCRIPT_DIR=%CD%"
-set "PYTHON_PATH=%SCRIPT_DIR%\venv\Scripts\python.exe"
-set "MAIN_SCRIPT=%SCRIPT_DIR%\main.py"
-
-echo.
-echo 选择签到时间:
-echo   1. 每天 8:00 和 20:00（推荐）
-echo   2. 每天 9:00
-echo   3. 自定义
-set /p time_choice="请选择 [1-3]: "
-
-if "%time_choice%"=="1" (
-    schtasks /create /tn "LinuxDO-Checkin-1" /tr "\"%PYTHON_PATH%\" \"%MAIN_SCRIPT%\"" /sc daily /st 08:00 /f >nul
-    schtasks /create /tn "LinuxDO-Checkin-2" /tr "\"%PYTHON_PATH%\" \"%MAIN_SCRIPT%\"" /sc daily /st 20:00 /f >nul
-    echo [成功] 定时任务已设置 (08:00, 20:00^)
-) else if "%time_choice%"=="2" (
-    schtasks /create /tn "LinuxDO-Checkin-1" /tr "\"%PYTHON_PATH%\" \"%MAIN_SCRIPT%\"" /sc daily /st 09:00 /f >nul
-    echo [成功] 定时任务已设置 (09:00^)
-) else (
-    set /p custom_time="输入时间 (如 08:00): "
-    schtasks /create /tn "LinuxDO-Checkin-1" /tr "\"%PYTHON_PATH%\" \"%MAIN_SCRIPT%\"" /sc daily /st !custom_time! /f >nul
-    echo [成功] 定时任务已设置 (!custom_time!^)
-)
-goto :eof
-
-:first_login
-set /p do_login="是否现在进行首次登录？[Y/n]: "
-if /i "%do_login%"=="n" goto :eof
-venv\Scripts\python.exe main.py --first-login
-goto :eof
-
-:run_checkin
-venv\Scripts\python.exe main.py
-goto :eof
-
-:print_completion
-echo.
-echo ╔════════════════════════════════════════════════════════════╗
-echo ║                    安装完成！                              ║
-echo ╚════════════════════════════════════════════════════════════╝
-echo.
-echo 后续操作:
-echo   1. 首次登录: venv\Scripts\python.exe main.py --first-login
-echo   2. 运行签到: venv\Scripts\python.exe main.py
-echo   3. 编辑配置: install.cmd 选择 3
-echo   4. 查看任务: schtasks /query /tn LinuxDO-Checkin-1
-echo.
-goto :eof
