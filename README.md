@@ -167,13 +167,16 @@
 
 ## 一键安装
 
-提供两种安装方式，选择适合你的：
+安装脚本位于 **`一键安装脚本点这里/`** 文件夹中，提供两种方式：
 
 ### 方式一：Polyglot 脚本（推荐，无需 Python）
 
 `install.cmd` 是一个多语言脚本，**同一个文件**在不同平台自动运行：
 
 ```bash
+# 进入脚本目录
+cd 一键安装脚本点这里
+
 # Windows: 双击 install.cmd 或命令行运行
 install.cmd
 
@@ -187,6 +190,9 @@ chmod +x install.cmd
 ### 方式二：Python 脚本（功能更完整）
 
 ```bash
+# 进入脚本目录
+cd 一键安装脚本点这里
+
 # 所有平台通用（需要 Python 3.8+）
 python setup.py
 ```
