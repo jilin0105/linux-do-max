@@ -74,7 +74,8 @@ install_dependencies() {
     print_info "安装系统依赖..."
 
     case $OS in
-        debian|ubuntu|raspbian)
+        debian|ubuntu|raspbian|kylin|uos|deepin|linuxmint|pop|elementary|zorin|kali|parrot)
+            # 基于 Debian/Ubuntu 的发行版（包括国产系统：银河麒麟、统信UOS、深度Deepin）
             sudo apt-get update
             sudo apt-get install -y \
                 python3 \

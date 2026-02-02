@@ -29,6 +29,25 @@
 
 ## 更新日志
 
+### v1.0.2 (2026-02-02)
+
+**新增国产操作系统支持：**
+
+| 系统 | 说明 |
+|------|------|
+| 银河麒麟 (Kylin) | 国产 ARM/x86 操作系统，基于 Ubuntu |
+| 统信 UOS | 国产操作系统，基于 Debian |
+| 深度 Deepin | 国产操作系统，基于 Debian |
+| Linux Mint | Ubuntu 衍生版 |
+| Pop!_OS | System76 的 Ubuntu 衍生版 |
+| Elementary OS | Ubuntu 衍生版 |
+| Zorin OS | Ubuntu 衍生版 |
+| Kali Linux | Debian 衍生版（安全测试） |
+| Parrot OS | Debian 衍生版（安全测试） |
+
+**修复文件：**
+- `scripts/setup_arm.sh` - 添加国产系统识别
+
 ### v1.0.1 (2026-01-31)
 
 **一键安装脚本修复：**
@@ -397,8 +416,8 @@ chmod +x install.py
 脚本会自动：
 - 检测操作系统（Windows/Linux/macOS）
 - 检测架构（x64/ARM64/ARM32）
-- 检测 Linux 发行版（Debian/Ubuntu/CentOS/Fedora/Arch/Alpine）
-- 检测包管理器（apt/dnf/yum/pacman/apk/brew）
+- 检测 Linux 发行版（Debian/Ubuntu/CentOS/Fedora/Arch/Alpine/银河麒麟/统信UOS/深度Deepin）
+- 检测包管理器（apt/dnf/yum/pacman/apk/brew/zypper）
 - 检测是否为树莓派/电视盒子等 ARM 设备
 - 检测是否有图形界面
 - 安装系统依赖（Chromium、Xvfb、中文字体）
@@ -473,8 +492,8 @@ chmod +x install.py
 │  1. 系统检测                                                │
 │     ├── 操作系统 (Linux/macOS/Windows)                      │
 │     ├── 架构 (x64/ARM64/ARM32)                              │
-│     ├── 发行版 (Debian/Ubuntu/CentOS/Fedora/Arch/Alpine)    │
-│     ├── 包管理器 (apt/dnf/yum/pacman/apk/brew)              │
+│     ├── 发行版 (Debian/Ubuntu/CentOS/Fedora/Arch/Alpine/银河麒麟/统信UOS/深度Deepin)    │
+│     ├── 包管理器 (apt/dnf/yum/pacman/apk/brew/zypper)              │
 │     ├── 是否为 ARM 设备 (树莓派/电视盒子)                    │
 │     └── 是否有图形界面                                       │
 │                                                             │
@@ -1048,6 +1067,18 @@ python3 main.py --first-login
 | Apple Silicon Mac | ARM64 | ✅ 完全支持 |
 | ARM 云服务器 | ARM64 | ✅ 完全支持 |
 | 其他 ARM64 设备 | ARM64 | ✅ 完全支持 |
+
+**支持的操作系统：**
+
+| 系统类型 | 发行版 | 包管理器 |
+|----------|--------|----------|
+| Debian 系 | Debian, Ubuntu, Raspberry Pi OS | apt |
+| 国产系统 | 银河麒麟(Kylin), 统信UOS, 深度Deepin | apt |
+| 衍生版 | Linux Mint, Pop!_OS, Elementary OS, Zorin OS | apt |
+| Red Hat 系 | Fedora, CentOS, RHEL | dnf/yum |
+| Arch 系 | Arch Linux, Manjaro | pacman |
+| Alpine | Alpine Linux | apk |
+| openSUSE | openSUSE | zypper |
 
 **前置条件：**
 - ARM64 架构（推荐）或 ARM32
