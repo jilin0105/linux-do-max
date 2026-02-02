@@ -117,39 +117,9 @@ jobs:
           name: linux-x64
           path: dist/linuxdo-checkin-linux-x64
 
-  # Linux ARM64 打包 (树莓派等)
-  build-linux-arm64:
-    runs-on: ubuntu-22.04
-    steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 设置 QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: 设置 Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: ARM64 环境打包
-        run: |
-          docker run --rm --platform linux/arm64 \
-            -v ${{ github.workspace }}:/work \
-            -w /work \
-            python:3.11-slim-bullseye \
-            bash -c "
-              pip install pyinstaller DrissionPage PyYAML requests && \
-              pyinstaller --onefile --name linuxdo-checkin-linux-arm64 main.py
-            "
-
-      - name: 上传构建产物
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-arm64
-          path: dist/linuxdo-checkin-linux-arm64
-
   # 创建 Release 并上传所有文件
   release:
-    needs: [build-windows, build-macos-x64, build-macos-arm64, build-linux-x64, build-linux-arm64]
+    needs: [build-windows, build-macos-x64, build-macos-arm64, build-linux-x64]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -178,7 +148,6 @@ jobs:
             - **macOS Intel**: `linuxdo-checkin-macos-x64`
             - **macOS Apple Silicon**: `linuxdo-checkin-macos-arm64`
             - **Linux x64**: `linuxdo-checkin-linux-x64`
-            - **Linux ARM64** (树莓派等): `linuxdo-checkin-linux-arm64`
 
             ### 使用方法
             1. 下载对应平台的可执行文件
@@ -192,6 +161,5 @@ jobs:
             artifacts/macos-x64/*
             artifacts/macos-arm64/*
             artifacts/linux-x64/*
-            artifacts/linux-arm64/*
           draft: false
           prerelease: false
