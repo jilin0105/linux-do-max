@@ -98,6 +98,8 @@ class SystemInfo:
         self.is_arm: bool = False
         self.is_raspberry_pi: bool = False
         self.is_docker: bool = False
+        self.is_lxc: bool = False
+        self.is_container: bool = False
         self.has_display: bool = False
         self.python_path: str = sys.executable
         self.browser_path: str = ""
@@ -194,14 +196,42 @@ class SystemInfo:
             pass
 
     def _detect_docker(self):
-        """检测是否在 Docker 容器中"""
+        """检测是否在 Docker/LXC 容器中"""
+        # Docker 检测
         if os.path.exists("/.dockerenv"):
             self.is_docker = True
+            self.is_container = True
         elif os.path.exists("/proc/1/cgroup"):
             try:
                 with open("/proc/1/cgroup") as f:
-                    if "docker" in f.read():
+                    content = f.read()
+                    if "docker" in content:
                         self.is_docker = True
+                        self.is_container = True
+                    elif "lxc" in content:
+                        self.is_lxc = True
+                        self.is_container = True
+            except:
+                pass
+
+        # LXC 检测（额外方法）
+        if not self.is_container:
+            # 检查 /run/.containerenv (Podman)
+            if os.path.exists("/run/.containerenv"):
+                self.is_container = True
+            # 使用 systemd-detect-virt 检测
+            try:
+                result = subprocess.run(
+                    ["systemd-detect-virt", "-c"],
+                    capture_output=True,
+                    text=True
+                )
+                if result.returncode == 0:
+                    virt_type = result.stdout.strip().lower()
+                    if virt_type in ("lxc", "lxc-libvirt", "docker", "podman", "openvz"):
+                        self.is_container = True
+                        if "lxc" in virt_type:
+                            self.is_lxc = True
             except:
                 pass
 
@@ -277,7 +307,10 @@ class SystemInfo:
             print(f"│ {pad_right('包管理器', 10)}│ {pad_right(self.pkg_manager, 26)} │")
         print(f"│ {pad_right('ARM设备', 10)}│ {pad_right('是' if self.is_arm else '否', 26)} │")
         print(f"│ {pad_right('树莓派', 10)}│ {pad_right('是' if self.is_raspberry_pi else '否', 26)} │")
-        print(f"│ {pad_right('Docker容器', 10)}│ {pad_right('是' if self.is_docker else '否', 26)} │")
+        print(f"│ {pad_right('容器环境', 10)}│ {pad_right('是' if self.is_container else '否', 26)} │")
+        if self.is_container:
+            container_type = "Docker" if self.is_docker else ("LXC" if self.is_lxc else "其他")
+            print(f"│ {pad_right('容器类型', 10)}│ {pad_right(container_type, 26)} │")
         print(f"│ {pad_right('图形界面', 10)}│ {pad_right('有' if self.has_display else '无', 26)} │")
         print(f"│ {pad_right('浏览器', 10)}│ {pad_right('已安装' if self.browser_path else '未安装', 26)} │")
         print("└────────────────────────────────────────┘")
@@ -296,6 +329,7 @@ class ConfigManager:
         "user_data_dir": "",
         "headless": False,
         "browser_path": "",
+        "chrome_args": [],
         "browse_count": 10,
         "like_probability": 0.3,
         "browse_interval_min": 3,
@@ -310,6 +344,7 @@ class ConfigManager:
         "USER_DATA_DIR": "user_data_dir",
         "HEADLESS": "headless",
         "BROWSER_PATH": "browser_path",
+        "CHROME_ARGS": "chrome_args",
         "BROWSE_COUNT": "browse_count",
         "LIKE_PROBABILITY": "like_probability",
         "BROWSE_INTERVAL_MIN": "browse_interval_min",
@@ -361,6 +396,13 @@ class ConfigManager:
 
     def save(self):
         """保存配置文件"""
+        # 处理 chrome_args
+        chrome_args = self.config.get('chrome_args', [])
+        if isinstance(chrome_args, list) and chrome_args:
+            chrome_args_str = "\n".join([f'  - "{arg}"' for arg in chrome_args])
+        else:
+            chrome_args_str = "  []"
+
         content = f"""# ============================================================
 # LinuxDO 签到配置文件
 # 由一键安装脚本自动生成
@@ -375,6 +417,12 @@ password: "{self.config['password']}"
 user_data_dir: "{self.config['user_data_dir']}"
 headless: {str(self.config['headless']).lower()}
 browser_path: "{self.config['browser_path']}"
+
+# Chrome 额外启动参数
+# LXC/Docker 容器需要 --no-sandbox
+# 无界面服务器可添加 --headless=new, --disable-gpu
+chrome_args:
+{chrome_args_str}
 
 # ========== 签到配置 ==========
 browse_count: {self.config['browse_count']}
@@ -999,6 +1047,15 @@ class Installer:
         default_user_data = os.path.join(self.sys_info.home_dir, ".linuxdo-browser")
         user_data_dir = input(f"用户数据目录 [{default_user_data}]: ").strip()
         self.config.set("user_data_dir", user_data_dir or default_user_data)
+
+        # 容器环境自动配置 chrome_args
+        if self.sys_info.is_container:
+            print()
+            print_warning("检测到容器环境 (LXC/Docker)")
+            print_info("已自动添加 --no-sandbox 参数以确保浏览器正常启动")
+            self.config.set("chrome_args", ["--no-sandbox"])
+        else:
+            self.config.set("chrome_args", [])
 
         # Telegram
         print()

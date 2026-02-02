@@ -213,6 +213,14 @@ interactive_config() {
         [ -x "$p" ] && BROWSER_PATH="$p" && break
     done
 
+    # LXC/Docker 容器检测，自动添加 --no-sandbox
+    CHROME_ARGS=""
+    if [ -f "/.dockerenv" ] || grep -q "docker\|lxc" /proc/1/cgroup 2>/dev/null || \
+       [ -f "/run/.containerenv" ] || systemd-detect-virt -c &>/dev/null; then
+        CHROME_ARGS="--no-sandbox"
+        print_warning "检测到容器环境，已自动添加 --no-sandbox 参数"
+    fi
+
     # 生成配置
     cat > config.yaml << EOF
 # LinuxDO 签到配置文件
@@ -229,6 +237,12 @@ browse_interval_min: 3
 browse_interval_max: 8
 tg_bot_token: "$TG_TOKEN"
 tg_chat_id: "$TG_CHAT_ID"
+
+# Chrome 额外启动参数
+# LXC/Docker 容器需要 --no-sandbox
+# 无界面服务器可添加 --headless=new
+chrome_args:
+$([ -n "$CHROME_ARGS" ] && echo "  - \"$CHROME_ARGS\"" || echo "  []")
 EOF
 
     mkdir -p "$USER_DATA_DIR"

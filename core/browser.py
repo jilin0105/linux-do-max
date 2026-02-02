@@ -42,6 +42,10 @@ class Browser:
         co.set_argument("--no-default-browser-check")
         co.set_argument("--disable-infobars")
 
+        # 用户自定义 Chrome 参数（如 --no-sandbox, --headless=new）
+        for arg in config.chrome_args:
+            co.set_argument(arg)
+
         return co
 
     def start(self) -> bool:

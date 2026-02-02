@@ -21,6 +21,16 @@ headless: false
 # 浏览器路径（可选，留空使用系统默认）
 browser_path: ""
 
+# Chrome 额外启动参数（可选）
+# LXC/Docker 容器环境需要添加 --no-sandbox
+# 无界面服务器需要添加 --headless=new
+# 示例:
+#   chrome_args:
+#     - "--no-sandbox"
+#     - "--headless=new"
+#     - "--disable-gpu"
+chrome_args: []
+
 # ========== 签到配置 ==========
 # 浏览帖子数量
 browse_count: 10

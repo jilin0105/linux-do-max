@@ -101,6 +101,17 @@ class Config:
         """浏览器路径（可选）"""
         return self.get("browser_path", "", allow_empty=True) or ""
 
+    @property
+    def chrome_args(self) -> list:
+        """Chrome 额外启动参数（如 --no-sandbox, --headless=new）"""
+        value = self.get("chrome_args", [])
+        if isinstance(value, list):
+            return value
+        if isinstance(value, str) and value:
+            # 支持逗号分隔的字符串格式
+            return [arg.strip() for arg in value.split(",") if arg.strip()]
+        return []
+
     # 签到配置
     @property
     def browse_count(self) -> int:

@@ -62,6 +62,10 @@ def first_login():
     co.set_argument("--no-first-run")
     co.set_argument("--no-default-browser-check")
 
+    # 用户自定义 Chrome 参数（如 --no-sandbox, --headless=new）
+    for arg in config.chrome_args:
+        co.set_argument(arg)
+
     print("正在启动浏览器...")
     try:
         page = ChromiumPage(co)

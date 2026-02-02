@@ -29,6 +29,38 @@
 
 ## 更新日志
 
+### v1.0.3 (2026-02-02)
+
+**新增 LXC/Docker 容器支持：**
+
+| 功能 | 说明 |
+|------|------|
+| `chrome_args` 配置 | 支持自定义 Chrome 启动参数 |
+| LXC 容器检测 | 自动检测 LXC/Docker/Podman 容器环境 |
+| 自动添加 `--no-sandbox` | 容器环境自动配置，无需手动设置 |
+
+**修复文件：**
+- `core/config.py` - 添加 `chrome_args` 配置项
+- `core/browser.py` - 应用自定义 Chrome 参数
+- `main.py` - 首次登录也支持自定义参数
+- `一键安装脚本点这里/linuxANDmacos.sh` - 容器检测和自动配置
+- `一键安装脚本点这里/install.py` - LXC 容器检测和自动配置
+
+**LXC 容器用户注意：**
+
+如果在 LXC 容器中遇到"浏览器启动失败"错误，请在 `config.yaml` 中添加：
+
+```yaml
+chrome_args:
+  - "--no-sandbox"
+```
+
+或设置环境变量：
+
+```bash
+export CHROME_ARGS="--no-sandbox"
+```
+
 ### v1.0.2 (2026-02-02)
 
 **新增国产操作系统支持：**
@@ -1462,6 +1494,15 @@ headless: false
 # Linux 示例: /usr/bin/google-chrome
 browser_path: ""
 
+# Chrome 额外启动参数（可选）
+# LXC/Docker 容器需要添加 --no-sandbox
+# 无界面服务器可添加 --headless=new
+# 示例:
+#   chrome_args:
+#     - "--no-sandbox"
+#     - "--disable-gpu"
+chrome_args: []
+
 # ========== 签到配置 ==========
 # 浏览帖子数量（默认 10）
 browse_count: 10
@@ -1490,6 +1531,7 @@ tg_chat_id: ""
 | user_data_dir | 字符串 | ~/.linuxdo-browser | 浏览器用户数据目录 |
 | headless | 布尔 | false | 是否无头模式 |
 | browser_path | 字符串 | 空 | 浏览器可执行文件路径 |
+| chrome_args | 列表 | [] | Chrome 额外启动参数 |
 | browse_count | 整数 | 10 | 每次浏览帖子数量 |
 | like_probability | 浮点 | 0.3 | 点赞概率（0-1） |
 | browse_interval_min | 整数 | 3 | 浏览间隔最小秒数 |
@@ -1508,6 +1550,7 @@ tg_chat_id: ""
 | USER_DATA_DIR | user_data_dir |
 | HEADLESS | headless |
 | BROWSER_PATH | browser_path |
+| CHROME_ARGS | chrome_args（逗号分隔） |
 | BROWSE_COUNT | browse_count |
 | LIKE_PROBABILITY | like_probability |
 | TG_BOT_TOKEN | tg_bot_token |
@@ -1729,6 +1772,60 @@ taskkill /f /im chrome.exe
 
 # Linux/macOS - 关闭所有 Chrome 进程
 pkill -f chrome
+```
+
+### 问题 1.1：LXC/Docker 容器中浏览器启动失败
+
+**错误信息：**
+```
+❌ 浏览器启动失败:
+浏览器连接失败。
+地址: 127.0.0.1:9222
+提示:
+1、用户文件夹没有和已打开的浏览器冲突
+2、如为无界面系统，请添加'--headless=new'启动参数
+3、如果是Linux系统，尝试添加'--no-sandbox'启动参数
+```
+
+**原因：** LXC/Docker 容器中 Chrome 需要 `--no-sandbox` 参数才能启动。
+
+**解决方法：**
+
+**方法1：修改配置文件（推荐）**
+
+编辑 `config.yaml`，添加：
+
+```yaml
+chrome_args:
+  - "--no-sandbox"
+```
+
+**方法2：设置环境变量**
+
+```bash
+export CHROME_ARGS="--no-sandbox"
+./linuxdo-checkin --first-login
+```
+
+**方法3：重新运行安装脚本**
+
+安装脚本会自动检测容器环境并配置：
+
+```bash
+# Linux/macOS
+./一键安装脚本点这里/linuxANDmacos.sh
+
+# 或使用 Python 脚本
+python3 一键安装脚本点这里/install.py
+```
+
+**注意：** 如果同时需要无头模式，可以添加多个参数：
+
+```yaml
+chrome_args:
+  - "--no-sandbox"
+  - "--headless=new"
+  - "--disable-gpu"
 ```
 
 ### 问题 2：页面加载超时
