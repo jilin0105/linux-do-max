@@ -131,10 +131,10 @@ jobs:
         uses: uraimo/run-on-arch-action@v2
         with:
           arch: aarch64
-          distro: ubuntu20.04  # 使用旧版 Ubuntu 以兼容更多系统 (glibc 2.31)
+          distro: bullseye  # Debian 11, glibc 2.31, 兼容性好
           run: |
             apt-get update
-            apt-get install -y python3 python3-pip
+            apt-get install -y python3 python3-pip python3-venv
             pip3 install pyinstaller DrissionPage PyYAML requests
             pyinstaller --onefile --name linuxdo-checkin-linux-arm64 main.py
 
