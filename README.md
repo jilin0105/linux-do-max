@@ -18,6 +18,7 @@
   - [方案D：Docker 部署](#方案ddocker-部署)
   - [方案E：青龙面板](#方案e青龙面板)
   - [方案F：ARM 设备部署](#方案farm-设备部署)
+  - [方案G：二进制安装](#方案g二进制安装)
 - [配置说明](#配置说明)
 - [Telegram 通知](#telegram-通知)
 - [常见问题](#常见问题)
@@ -243,15 +244,17 @@ export CHROME_ARGS="--no-sandbox"
 | **Windows** | 任务计划程序 | `scripts/setup_task.bat` | ⭐ 简单 |
 | **macOS** | launchd | `scripts/setup_task.sh` | ⭐⭐ 中等 |
 | **Linux** | cron | `scripts/setup_task_linux.sh` | ⭐⭐ 中等 |
+| **Linux 二进制** | cron | 预编译可执行文件 | ⭐ 简单 |
 | **Docker** | docker-compose | `docker-compose.yml` | ⭐⭐⭐ 较难 |
 | **青龙面板** | 内置调度 | `ql_main.py` | ⭐⭐⭐ 较难 |
 | **ARM 设备** | cron / Docker | `scripts/setup_arm.sh` | ⭐⭐ 中等 |
 
 **推荐选择：**
 - 个人电脑：Windows / macOS 方案
-- 服务器：Linux / Docker 方案
+- 服务器：Linux / Docker / **二进制** 方案
 - 已有青龙面板：青龙方案
 - 树莓派/ARM 服务器：ARM 设备方案
+- **LXC 容器/VPS：二进制方案（最简单）**
 
 ---
 
@@ -1463,6 +1466,312 @@ xvfb-run -a python3 main.py
 4. **散热** - 树莓派运行 Chromium 会发热，建议加装散热片/风扇
 5. **SD 卡** - 建议使用高速 SD 卡（Class 10 / A1 / A2）
 6. **电视盒子** - 通常无图形界面，推荐使用方案四
+
+---
+
+### 方案G：二进制安装
+
+**适用场景：** Linux 服务器、LXC 容器、VPS，无需安装 Python 环境，开箱即用
+
+**优势：**
+- 无需安装 Python 和依赖
+- 单文件部署，简单快捷
+- 适合 LXC/Docker 容器环境
+- 文件体积小，下载快
+
+**支持平台：**
+
+| 平台 | 文件名 | 说明 |
+|------|--------|------|
+| Linux x64 | `linuxdo-checkin-linux-x64` | 适用于大多数 Linux 服务器、VPS、LXC 容器 |
+| Linux ARM64 | `linuxdo-checkin-linux-arm64` | 适用于树莓派、ARM 服务器 |
+| macOS x64 | `linuxdo-checkin-macos-x64` | 适用于 Intel Mac |
+| macOS ARM64 | `linuxdo-checkin-macos-arm64` | 适用于 Apple Silicon Mac (M1/M2/M3) |
+| Windows x64 | `linuxdo-checkin-windows-x64.exe` | 适用于 Windows 系统 |
+
+#### 下载地址
+
+前往 [GitHub Releases](https://github.com/xtgm/linux-do-max/releases) 下载最新版本。
+
+---
+
+#### Linux x64 / LXC 容器安装（完整流程）
+
+**适用于：** Debian、Ubuntu、CentOS 等 x86_64 Linux 系统，以及 LXC/Docker 容器
+
+##### 步骤 1：安装系统依赖
+
+```bash
+# Debian/Ubuntu
+apt update && apt install -y wget unzip chromium xvfb fonts-wqy-zenhei fonts-wqy-microhei
+
+# CentOS/RHEL
+yum install -y wget unzip chromium xorg-x11-server-Xvfb wqy-zenhei-fonts
+
+# Alpine
+apk add wget unzip chromium xvfb ttf-wqy-zenhei
+```
+
+##### 步骤 2：下载二进制文件
+
+```bash
+cd /root
+
+# 下载最新版本（替换 v0.3.2 为实际版本号）
+wget https://github.com/xtgm/linux-do-max/releases/download/v0.3.2/linuxdo-checkin-linux-x64
+
+# 赋予执行权限
+chmod +x linuxdo-checkin-linux-x64
+```
+
+##### 步骤 3：创建配置文件
+
+```bash
+cat > /root/config.yaml << 'EOF'
+# LXC/Docker 容器必须配置
+chrome_args:
+  - "--no-sandbox"
+  - "--disable-dev-shm-usage"
+
+# 有头模式（必须，CF 验证需要）
+headless: false
+
+# 浏览器路径
+browser_path: "/usr/bin/chromium"
+
+# 签到配置
+browse_count: 10
+like_probability: 0.3
+
+# Telegram 通知（可选，留空则不通知）
+tg_bot_token: ""
+tg_chat_id: ""
+EOF
+```
+
+> **注意**：LXC/Docker 容器环境必须添加 `--no-sandbox` 参数，否则浏览器无法启动。
+
+##### 步骤 4：首次登录（在有图形界面的电脑上完成）
+
+由于服务器没有图形界面，首次登录需要在有图形界面的电脑上完成，然后将登录数据上传到服务器。
+
+**在 Windows 电脑上：**
+
+```cmd
+cd E:\linuxdo-checkin
+python main.py --first-login
+```
+
+完成登录后，打包上传登录数据：
+
+```powershell
+# PowerShell 打包
+Compress-Archive -Path "$env:USERPROFILE\.linuxdo-browser" -DestinationPath linuxdo-browser.zip
+
+# 上传到服务器（替换为你的服务器 IP）
+scp linuxdo-browser.zip root@你的服务器IP:~/
+```
+
+**在 macOS/Linux 电脑上：**
+
+```bash
+# 打包
+tar -czvf linuxdo-browser.tar.gz -C ~ .linuxdo-browser
+
+# 上传到服务器
+scp linuxdo-browser.tar.gz root@你的服务器IP:~/
+```
+
+**在服务器上解压：**
+
+```bash
+cd /root
+
+# 如果是 zip 文件
+unzip linuxdo-browser.zip
+
+# 如果是 tar.gz 文件
+tar -xzvf linuxdo-browser.tar.gz
+
+# 确认数据已就位
+ls -la ~/.linuxdo-browser/
+```
+
+##### 步骤 5：测试运行
+
+```bash
+# 使用 xvfb-run 运行（有头模式 + 虚拟显示）
+xvfb-run -a /root/linuxdo-checkin-linux-x64
+```
+
+##### 步骤 6：设置定时任务
+
+```bash
+# 编辑 crontab
+crontab -e
+
+# 添加以下内容（每天 8:00 和 20:00 执行）
+0 8 * * * cd /root && xvfb-run -a ./linuxdo-checkin-linux-x64 >> /root/checkin.log 2>&1
+0 20 * * * cd /root && xvfb-run -a ./linuxdo-checkin-linux-x64 >> /root/checkin.log 2>&1
+```
+
+或使用一键命令添加：
+
+```bash
+(crontab -l 2>/dev/null; echo "0 8 * * * cd /root && xvfb-run -a ./linuxdo-checkin-linux-x64 >> /root/checkin.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 20 * * * cd /root && xvfb-run -a ./linuxdo-checkin-linux-x64 >> /root/checkin.log 2>&1") | crontab -
+```
+
+##### 完整命令汇总
+
+```bash
+# 1. 安装依赖
+apt update && apt install -y wget unzip chromium xvfb fonts-wqy-zenhei fonts-wqy-microhei
+
+# 2. 下载二进制
+cd /root
+wget https://github.com/xtgm/linux-do-max/releases/download/v0.3.2/linuxdo-checkin-linux-x64
+chmod +x linuxdo-checkin-linux-x64
+
+# 3. 创建配置文件
+cat > /root/config.yaml << 'EOF'
+chrome_args:
+  - "--no-sandbox"
+  - "--disable-dev-shm-usage"
+headless: false
+browser_path: "/usr/bin/chromium"
+browse_count: 10
+like_probability: 0.3
+tg_bot_token: ""
+tg_chat_id: ""
+EOF
+
+# 4. 上传登录数据后解压（在本地电脑完成首次登录后）
+unzip linuxdo-browser.zip
+
+# 5. 测试运行
+xvfb-run -a ./linuxdo-checkin-linux-x64
+
+# 6. 设置定时任务
+(crontab -l 2>/dev/null; echo "0 8 * * * cd /root && xvfb-run -a ./linuxdo-checkin-linux-x64 >> /root/checkin.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 20 * * * cd /root && xvfb-run -a ./linuxdo-checkin-linux-x64 >> /root/checkin.log 2>&1") | crontab -
+```
+
+---
+
+#### Linux ARM64 安装
+
+**适用于：** 树莓派、Orange Pi、ARM 云服务器等 ARM64 设备
+
+```bash
+# 1. 安装依赖
+apt update && apt install -y wget unzip chromium xvfb fonts-wqy-zenhei fonts-wqy-microhei
+
+# 2. 下载 ARM64 版本
+cd /root
+wget https://github.com/xtgm/linux-do-max/releases/download/v0.3.2/linuxdo-checkin-linux-arm64
+chmod +x linuxdo-checkin-linux-arm64
+
+# 3. 创建配置文件（同上）
+cat > /root/config.yaml << 'EOF'
+chrome_args:
+  - "--no-sandbox"
+  - "--disable-dev-shm-usage"
+headless: false
+browser_path: "/usr/bin/chromium-browser"
+browse_count: 10
+like_probability: 0.3
+tg_bot_token: ""
+tg_chat_id: ""
+EOF
+
+# 4. 上传登录数据后解压
+unzip linuxdo-browser.zip
+
+# 5. 测试运行
+xvfb-run -a ./linuxdo-checkin-linux-arm64
+
+# 6. 设置定时任务
+(crontab -l 2>/dev/null; echo "0 8 * * * cd /root && xvfb-run -a ./linuxdo-checkin-linux-arm64 >> /root/checkin.log 2>&1") | crontab -
+```
+
+---
+
+#### macOS 安装
+
+```bash
+# 1. 下载对应版本
+# Intel Mac
+curl -L -o linuxdo-checkin https://github.com/xtgm/linux-do-max/releases/download/v0.3.2/linuxdo-checkin-macos-x64
+
+# Apple Silicon Mac (M1/M2/M3)
+curl -L -o linuxdo-checkin https://github.com/xtgm/linux-do-max/releases/download/v0.3.2/linuxdo-checkin-macos-arm64
+
+# 2. 赋予执行权限
+chmod +x linuxdo-checkin
+
+# 3. 首次登录
+./linuxdo-checkin --first-login
+
+# 4. 运行签到
+./linuxdo-checkin
+```
+
+---
+
+#### Windows 安装
+
+```cmd
+:: 1. 下载 linuxdo-checkin-windows-x64.exe
+
+:: 2. 首次登录
+linuxdo-checkin-windows-x64.exe --first-login
+
+:: 3. 运行签到
+linuxdo-checkin-windows-x64.exe
+```
+
+---
+
+#### 二进制安装常见问题
+
+##### Q: 浏览器启动失败，提示 `--no-sandbox`？
+
+**A:** 在 `config.yaml` 中添加：
+
+```yaml
+chrome_args:
+  - "--no-sandbox"
+```
+
+##### Q: 找不到 Chromium？
+
+**A:** 检查浏览器路径：
+
+```bash
+# 查找 Chromium 路径
+which chromium || which chromium-browser
+
+# 更新 config.yaml 中的 browser_path
+```
+
+##### Q: 如何更新到新版本？
+
+**A:** 重新下载最新版本覆盖即可：
+
+```bash
+cd /root
+wget -O linuxdo-checkin-linux-x64 https://github.com/xtgm/linux-do-max/releases/download/v新版本号/linuxdo-checkin-linux-x64
+chmod +x linuxdo-checkin-linux-x64
+```
+
+##### Q: 如何查看当前版本？
+
+**A:** 运行：
+
+```bash
+./linuxdo-checkin-linux-x64 --check-update
+```
 
 ---
 
