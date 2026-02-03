@@ -30,7 +30,50 @@
 
 ## 更新日志
 
-### v1.0.3 (2026-02-02)
+### v0.3.3 (2026-02-03) - Linux/ARM 浏览器启动修复
+
+**重要修复：彻底解决 Linux 系统浏览器启动失败问题**
+
+> 此版本后，Linux 用户（包括有图形界面的桌面环境）无需手动配置即可正常使用。
+
+| 修复项 | 说明 |
+|--------|------|
+| Linux 自动适配 | 自动检测 Linux 系统并添加必要的 Chrome 启动参数 |
+| `--no-sandbox` | Linux 系统自动添加（不仅限于容器环境） |
+| `--disable-dev-shm-usage` | 避免 `/dev/shm` 空间不足导致崩溃 |
+| `--disable-gpu` | 避免虚拟机/无 GPU 环境问题 |
+| 浏览器路径检测 | 增强检测，支持 snap/flatpak 安装的浏览器 |
+| 定时任务优化 | 有图形界面时设置 DISPLAY 环境变量，无需 xvfb-run |
+
+**修复文件：**
+- `core/browser.py` - 新增 `get_linux_chrome_args()` 和 `find_browser_path()` 函数
+- `main.py` - 首次登录同步修复，添加详细错误提示
+- `一键安装脚本点这里/install.py` - Linux 自动添加浏览器参数，定时任务优化
+- `一键安装脚本点这里/linuxANDmacos.sh` - 同步更新
+- `README.md` - 故障排除部分重写
+- `config.yaml.example` - 添加详细的 Linux 配置说明
+
+**如果仍然遇到问题：**
+
+```bash
+# 更新到最新版本
+git pull origin main
+
+# 或重新克隆
+git clone https://github.com/xtgm/linux-do-max.git
+```
+
+### v0.3.2 (2026-02-02)
+
+**修复 Linux 预编译二进制 glibc 兼容性问题：**
+
+| 修复项 | 说明 |
+|--------|------|
+| glibc 版本 | 从 2.38 降到 2.31 |
+| 兼容系统 | Debian 11+、Ubuntu 20.04+、大部分 LXC 容器 |
+| 构建环境 | Linux x64 改为 ubuntu-20.04，ARM64 改为 ubuntu20.04 |
+
+### v0.3.1 (2026-02-02)
 
 **新增 LXC/Docker 容器支持：**
 
@@ -40,29 +83,7 @@
 | LXC 容器检测 | 自动检测 LXC/Docker/Podman 容器环境 |
 | 自动添加 `--no-sandbox` | 容器环境自动配置，无需手动设置 |
 
-**修复文件：**
-- `core/config.py` - 添加 `chrome_args` 配置项
-- `core/browser.py` - 应用自定义 Chrome 参数
-- `main.py` - 首次登录也支持自定义参数
-- `一键安装脚本点这里/linuxANDmacos.sh` - 容器检测和自动配置
-- `一键安装脚本点这里/install.py` - LXC 容器检测和自动配置
-
-**LXC 容器用户注意：**
-
-如果在 LXC 容器中遇到"浏览器启动失败"错误，请在 `config.yaml` 中添加：
-
-```yaml
-chrome_args:
-  - "--no-sandbox"
-```
-
-或设置环境变量：
-
-```bash
-export CHROME_ARGS="--no-sandbox"
-```
-
-### v1.0.2 (2026-02-02)
+### v0.3.0 (2026-02-02)
 
 **新增国产操作系统支持：**
 
@@ -81,7 +102,7 @@ export CHROME_ARGS="--no-sandbox"
 **修复文件：**
 - `scripts/setup_arm.sh` - 添加国产系统识别
 
-### v1.0.1 (2026-01-31)
+### v0.2.1 (2026-01-31)
 
 **一键安装脚本修复：**
 
@@ -101,7 +122,7 @@ export CHROME_ARGS="--no-sandbox"
 - `一键安装脚本点这里/linuxANDmacos.sh` - Linux/macOS 一键安装脚本
 - `一键安装脚本点这里/install.py` - Python 跨平台安装脚本
 
-### v1.0.0 (2026-01-30)
+### v0.2.0 (2026-01-30)
 
 **初始版本：**
 - 支持 Windows/macOS/Linux/Docker/青龙面板/ARM 设备
