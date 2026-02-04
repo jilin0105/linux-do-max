@@ -122,26 +122,39 @@ install_deps() {
                 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
                 libxrandr2 libgbm1 libasound2 wget curl 2>/dev/null || true
 
-            # 检查是否已有浏览器
+            # 强制安装 Google Chrome（Snap 版 Chromium 有沙箱限制，无法使用）
+            # 只有检测到 google-chrome 才跳过
             if command -v google-chrome &>/dev/null || command -v google-chrome-stable &>/dev/null; then
-                print_info "Google Chrome detected, skipping browser install"
-            elif command -v chromium &>/dev/null && ! command -v snap &>/dev/null; then
-                print_info "Chromium detected (non-Snap), skipping browser install"
+                print_info "Google Chrome detected, skipping install"
             else
-                # Ubuntu 22.04+ 的 chromium-browser 是 Snap 包，需要访问 snap store
-                # 优先安装 Google Chrome（deb 包，无需 snap store）
-                print_info "Installing Google Chrome..."
+                print_info "Installing Google Chrome (required, Snap Chromium not supported)..."
                 TEMP_DEB="/tmp/google-chrome.deb"
-                if wget -q -O "$TEMP_DEB" "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" 2>/dev/null; then
-                    sudo dpkg -i "$TEMP_DEB" 2>/dev/null || true
-                    sudo apt-get install -f -y 2>/dev/null || true
-                    rm -f "$TEMP_DEB"
-                    print_success "Google Chrome installed"
-                else
-                    # 下载失败，尝试安装 chromium（可能触发 Snap）
-                    print_warning "Chrome download failed, trying Chromium..."
+
+                # 根据架构选择下载链接
+                if [ "$ARCH_TYPE" = "arm64" ]; then
+                    print_warning "Google Chrome not available for ARM64, trying Chromium..."
                     sudo apt-get install -y chromium-browser 2>/dev/null || \
                     sudo apt-get install -y chromium 2>/dev/null || true
+                else
+                    # x64 架构下载 Google Chrome
+                    wget -O "$TEMP_DEB" "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" 2>/dev/null
+                    if [ -f "$TEMP_DEB" ] && [ -s "$TEMP_DEB" ]; then
+                        sudo dpkg -i "$TEMP_DEB" 2>/dev/null || true
+                        sudo apt-get install -f -y 2>/dev/null || true
+                        rm -f "$TEMP_DEB"
+
+                        # 验证安装
+                        if command -v google-chrome &>/dev/null; then
+                            print_success "Google Chrome installed successfully"
+                        else
+                            print_error "Google Chrome installation failed!"
+                            print_info "Please install manually: wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && sudo dpkg -i google-chrome-stable_current_amd64.deb"
+                        fi
+                    else
+                        print_error "Failed to download Google Chrome"
+                        print_info "Please check your network connection or proxy settings"
+                        print_info "Manual install: wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && sudo dpkg -i google-chrome-stable_current_amd64.deb"
+                    fi
                 fi
             fi
             # 刷新字体缓存
@@ -149,16 +162,29 @@ install_deps() {
             ;;
         dnf)
             sudo dnf install -y python3 python3-pip python3-virtualenv python3-devel || true
-            sudo dnf install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts || true
+            # Fedora/RHEL: 安装 Google Chrome
+            if ! command -v google-chrome &>/dev/null; then
+                print_info "Installing Google Chrome..."
+                sudo dnf install -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm 2>/dev/null || \
+                sudo dnf install -y chromium 2>/dev/null || true
+            fi
+            sudo dnf install -y xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts || true
             fc-cache -fv 2>/dev/null || true
             ;;
         yum)
             sudo yum install -y python3 python3-pip python3-virtualenv python3-devel || true
-            sudo yum install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts || true
+            # CentOS/RHEL: 安装 Google Chrome
+            if ! command -v google-chrome &>/dev/null; then
+                print_info "Installing Google Chrome..."
+                sudo yum install -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm 2>/dev/null || \
+                sudo yum install -y chromium 2>/dev/null || true
+            fi
+            sudo yum install -y xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts || true
             fc-cache -fv 2>/dev/null || true
             ;;
         pacman)
             sudo pacman -Syu --noconfirm python python-pip python-virtualenv || true
+            # Arch: google-chrome 在 AUR，使用 chromium
             sudo pacman -Syu --noconfirm chromium xorg-server-xvfb wqy-zenhei wqy-microhei || true
             fc-cache -fv 2>/dev/null || true
             ;;
@@ -170,16 +196,26 @@ install_deps() {
             ;;
         zypper)
             sudo zypper install -y python3 python3-pip python3-virtualenv python3-devel || true
-            sudo zypper install -y chromium xvfb-run google-noto-sans-cjk-fonts || true
+            # openSUSE: 安装 Google Chrome
+            if ! command -v google-chrome &>/dev/null; then
+                print_info "Installing Google Chrome..."
+                sudo zypper install -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm 2>/dev/null || \
+                sudo zypper install -y chromium 2>/dev/null || true
+            fi
+            sudo zypper install -y xvfb-run google-noto-sans-cjk-fonts || true
             fc-cache -fv 2>/dev/null || true
             ;;
         brew)
             brew install python3 || true
-            [ ! -d "/Applications/Google Chrome.app" ] && \
-                print_warning "Please install Chrome: https://www.google.com/chrome/"
+            # macOS: 检查并安装 Chrome
+            if [ ! -d "/Applications/Google Chrome.app" ]; then
+                print_info "Installing Google Chrome..."
+                brew install --cask google-chrome 2>/dev/null || \
+                print_warning "Please install Chrome manually: https://www.google.com/chrome/"
+            fi
             ;;
         *)
-            print_warning "Unknown package manager. Please install: Python3, pip, venv, Chromium, Xvfb"
+            print_warning "Unknown package manager. Please install: Python3, pip, venv, Google Chrome, Xvfb"
             ;;
     esac
 

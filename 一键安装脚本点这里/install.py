@@ -590,33 +590,51 @@ class DependencyInstaller:
             for pkg in base_packages:
                 self._run_cmd(f"sudo apt-get install -y {pkg}", ignore_error=True)
 
-            # 检查是否已有浏览器
-            has_browser = (
+            # 强制安装 Google Chrome（Snap 版 Chromium 有沙箱限制，无法使用）
+            # 只有检测到 google-chrome 才跳过
+            has_chrome = (
                 shutil.which("google-chrome") or
-                shutil.which("google-chrome-stable") or
-                (shutil.which("chromium") and not shutil.which("snap"))
+                shutil.which("google-chrome-stable")
             )
 
-            if has_browser:
-                print_info("检测到浏览器，跳过浏览器安装")
+            if has_chrome:
+                print_info("检测到 Google Chrome，跳过安装")
             else:
-                # Ubuntu 22.04+ 的 chromium-browser 是 Snap 包，需要访问 snap store
-                # 优先安装 Google Chrome（deb 包，无需 snap store）
-                print_info("安装 Google Chrome...")
-                chrome_deb = "/tmp/google-chrome.deb"
-                download_result = self._run_cmd(
-                    f'wget -q -O "{chrome_deb}" "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"',
-                    ignore_error=True
-                )
-                if download_result == 0:
-                    self._run_cmd(f'sudo dpkg -i "{chrome_deb}"', ignore_error=True)
-                    self._run_cmd("sudo apt-get install -f -y", ignore_error=True)
-                    self._run_cmd(f'rm -f "{chrome_deb}"', ignore_error=True)
-                    print_success("Google Chrome 安装完成")
-                else:
-                    # 下载失败，尝试安装 chromium（可能触发 Snap）
-                    print_warning("Google Chrome 下载失败，尝试安装 Chromium...")
+                # Ubuntu 22.04+ 的 chromium-browser 是 Snap 包，有沙箱限制
+                # 必须安装 Google Chrome（deb 包）
+                print_info("安装 Google Chrome（必需，Snap 版 Chromium 不支持）...")
+
+                # 检查架构
+                if self.sys_info.is_arm:
+                    print_warning("ARM64 架构暂不支持 Google Chrome，尝试安装 Chromium...")
                     self._run_cmd("sudo apt-get install -y chromium-browser", ignore_error=True)
+                else:
+                    chrome_deb = "/tmp/google-chrome.deb"
+                    chrome_url = "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+
+                    print_info(f"下载 Google Chrome: {chrome_url}")
+                    download_result = self._run_cmd(
+                        f'wget -O "{chrome_deb}" "{chrome_url}"',
+                        ignore_error=True
+                    )
+
+                    # 检查文件是否下载成功
+                    if download_result == 0 and os.path.exists(chrome_deb) and os.path.getsize(chrome_deb) > 1000000:
+                        print_info("安装 Google Chrome...")
+                        self._run_cmd(f'sudo dpkg -i "{chrome_deb}"', ignore_error=True)
+                        self._run_cmd("sudo apt-get install -f -y", ignore_error=True)
+                        self._run_cmd(f'rm -f "{chrome_deb}"', ignore_error=True)
+
+                        # 验证安装
+                        if shutil.which("google-chrome") or shutil.which("google-chrome-stable"):
+                            print_success("Google Chrome 安装成功")
+                        else:
+                            print_error("Google Chrome 安装失败！")
+                            print_info("请手动安装: wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && sudo dpkg -i google-chrome-stable_current_amd64.deb")
+                    else:
+                        print_error("Google Chrome 下载失败！")
+                        print_info("请检查网络连接或代理设置")
+                        print_info("手动安装: wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && sudo dpkg -i google-chrome-stable_current_amd64.deb")
 
             # 刷新字体缓存
             self._run_cmd("fc-cache -fv", ignore_error=True)
@@ -624,18 +642,27 @@ class DependencyInstaller:
         elif pkg_manager == "dnf":
             print_info("使用 dnf 安装依赖...")
             self._run_cmd("sudo dnf install -y python3 python3-pip python3-virtualenv python3-devel", ignore_error=True)
-            self._run_cmd("sudo dnf install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts", ignore_error=True)
+            # Fedora/RHEL: 安装 Google Chrome
+            if not shutil.which("google-chrome"):
+                print_info("安装 Google Chrome...")
+                self._run_cmd("sudo dnf install -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm", ignore_error=True)
+            self._run_cmd("sudo dnf install -y xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts", ignore_error=True)
             self._run_cmd("fc-cache -fv", ignore_error=True)
 
         elif pkg_manager == "yum":
             print_info("使用 yum 安装依赖...")
             self._run_cmd("sudo yum install -y python3 python3-pip python3-virtualenv python3-devel", ignore_error=True)
-            self._run_cmd("sudo yum install -y chromium chromedriver xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts", ignore_error=True)
+            # CentOS/RHEL: 安装 Google Chrome
+            if not shutil.which("google-chrome"):
+                print_info("安装 Google Chrome...")
+                self._run_cmd("sudo yum install -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm", ignore_error=True)
+            self._run_cmd("sudo yum install -y xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts", ignore_error=True)
             self._run_cmd("fc-cache -fv", ignore_error=True)
 
         elif pkg_manager == "pacman":
             print_info("使用 pacman 安装依赖...")
             self._run_cmd("sudo pacman -Syu --noconfirm python python-pip python-virtualenv", ignore_error=True)
+            # Arch: google-chrome 在 AUR，使用 chromium
             self._run_cmd("sudo pacman -Syu --noconfirm chromium xorg-server-xvfb wqy-zenhei wqy-microhei", ignore_error=True)
             self._run_cmd("fc-cache -fv", ignore_error=True)
 
@@ -649,12 +676,16 @@ class DependencyInstaller:
         elif pkg_manager == "zypper":
             print_info("使用 zypper 安装依赖...")
             self._run_cmd("sudo zypper install -y python3 python3-pip python3-virtualenv python3-devel", ignore_error=True)
-            self._run_cmd("sudo zypper install -y chromium xvfb-run google-noto-sans-cjk-fonts", ignore_error=True)
+            # openSUSE: 安装 Google Chrome
+            if not shutil.which("google-chrome"):
+                print_info("安装 Google Chrome...")
+                self._run_cmd("sudo zypper install -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm", ignore_error=True)
+            self._run_cmd("sudo zypper install -y xvfb-run google-noto-sans-cjk-fonts", ignore_error=True)
             self._run_cmd("fc-cache -fv", ignore_error=True)
 
         else:
             print_warning(f"未知包管理器: {pkg_manager}")
-            print_info("请手动安装: Python3, pip, venv, Chromium, Xvfb, 中文字体")
+            print_info("请手动安装: Python3, pip, venv, Google Chrome, Xvfb, 中文字体")
 
     def _install_macos_deps(self):
         """安装 macOS 依赖"""
@@ -663,10 +694,19 @@ class DependencyInstaller:
             print_info("安装 Homebrew...")
             self._run_cmd('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"')
 
-        # 检查 Chrome
-        if not self.sys_info.browser_path:
-            print_warning("未检测到 Chrome/Chromium")
-            print_info("请从 https://www.google.com/chrome/ 下载安装")
+        # 安装 Python
+        print_info("安装 Python...")
+        self._run_cmd("brew install python3", ignore_error=True)
+
+        # 检查并安装 Chrome
+        if not os.path.exists("/Applications/Google Chrome.app"):
+            print_info("安装 Google Chrome...")
+            result = self._run_cmd("brew install --cask google-chrome", ignore_error=True)
+            if result != 0:
+                print_warning("自动安装 Chrome 失败")
+                print_info("请从 https://www.google.com/chrome/ 下载安装")
+        else:
+            print_info("检测到 Google Chrome，跳过安装")
 
     def _check_windows_deps(self):
         """检查 Windows 依赖"""
