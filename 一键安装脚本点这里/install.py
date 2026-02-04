@@ -323,8 +323,8 @@ class SystemInfo:
             return False
 
         try:
-            # 测试页面 HTML
-            test_url = "data:text/html,<html><head><title>Chrome Test</title><style>body{font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:linear-gradient(135deg,%234CAF50,%2345a049);color:white;text-align:center;}</style></head><body><div><h1>Google Chrome 启动成功!</h1><p>浏览器工作正常，请关闭此窗口继续安装</p></div></body></html>"
+            # 直接打开 Google 首页测试
+            test_url = "https://www.google.com"
 
             # 启动参数（有界面模式）
             launch_args = [
@@ -343,7 +343,7 @@ class SystemInfo:
             )
 
             print_info(f"浏览器已启动 (PID: {process.pid})")
-            print_info("如果看到绿色页面显示「Google Chrome 启动成功!」说明浏览器正常")
+            print_info("如果看到 Google 搜索页面，说明浏览器正常工作")
             print()
 
             # 等待用户确认

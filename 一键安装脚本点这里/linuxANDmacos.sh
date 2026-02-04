@@ -178,7 +178,7 @@ test_browser_launch() {
 
     # 构建启动参数（有界面模式）
     LAUNCH_ARGS="--no-sandbox --disable-dev-shm-usage --disable-gpu"
-    TEST_URL="data:text/html,<html><head><title>Chrome Test</title><style>body{font-family:Arial,sans-serif;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:linear-gradient(135deg,%234CAF50,%2345a049);color:white;text-align:center;}</style></head><body><div><h1>Google Chrome 启动成功!</h1><p>浏览器工作正常，请关闭此窗口继续安装</p></div></body></html>"
+    TEST_URL="https://www.google.com"
 
     # 启动浏览器（后台运行）
     "$BROWSER_PATH" $LAUNCH_ARGS "$TEST_URL" &
@@ -186,7 +186,7 @@ test_browser_launch() {
 
     echo ""
     print_info "浏览器已启动 (PID: $BROWSER_PID)"
-    print_info "如果看到绿色页面显示「Google Chrome 启动成功!」说明浏览器正常"
+    print_info "如果看到 Google 搜索页面，说明浏览器正常工作"
     echo ""
 
     read -p "浏览器是否正常显示？[Y/n]: " BROWSER_OK
