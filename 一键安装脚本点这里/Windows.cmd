@@ -2,7 +2,7 @@
 chcp 65001 >nul 2>&1
 setlocal enabledelayedexpansion
 
-set "VERSION=1.3.0"
+set "VERSION=1.4.0"
 cd /d "%~dp0.."
 
 echo.
@@ -62,7 +62,41 @@ if not defined CHROME_PATH (
     echo [警告] 未检测到 Chrome 浏览器
     echo [提示] 请访问 https://www.google.com/chrome/ 下载安装
     echo.
+    set "open_chrome="
+    set /p open_chrome="是否现在打开下载页面？[Y/n]: "
+    if /i not "!open_chrome!"=="n" (
+        start https://www.google.com/chrome/
+        echo.
+        echo [提示] 请安装 Chrome 后重新运行此脚本
+        pause
+        exit /b 1
+    )
+    echo.
+    echo [警告] 继续安装，但首次登录可能会失败
+    echo.
+    goto :skip_browser_test
 )
+
+REM 验证浏览器安装
+echo [信息] 验证浏览器安装...
+echo [成功] 检测到浏览器: %CHROME_PATH%
+
+REM 获取 Chrome 版本
+for /f "tokens=*" %%v in ('"%CHROME_PATH%" --version 2^>nul') do (
+    echo [信息] 浏览器版本: %%v
+)
+
+echo.
+echo [信息] 测试浏览器启动...
+"%CHROME_PATH%" --headless=new --disable-gpu --no-sandbox --dump-dom "data:text/html,<h1>Test</h1>" >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [成功] 浏览器启动测试通过！
+) else (
+    echo [警告] 浏览器启动测试未能确认，但可能仍然可用
+)
+echo.
+
+:skip_browser_test
 
 if not exist "main.py" (
     if not exist "requirements.txt" (

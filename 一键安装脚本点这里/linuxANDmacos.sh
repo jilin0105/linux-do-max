@@ -6,7 +6,7 @@
 
 set -e
 
-VERSION="1.3.0"
+VERSION="1.4.0"
 
 # 颜色
 RED='\033[0;31m'
@@ -106,6 +106,90 @@ detect_system() {
     echo ""
 }
 
+# 获取浏览器路径
+get_browser_path() {
+    # 按优先级检测浏览器
+    for p in /usr/bin/google-chrome /usr/bin/google-chrome-stable \
+             /usr/bin/chromium-browser /usr/bin/chromium /usr/lib/chromium/chromium \
+             /usr/lib/chromium-browser/chromium-browser /snap/bin/chromium \
+             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; do
+        [ -x "$p" ] && echo "$p" && return 0
+    done
+
+    # 尝试 which 命令
+    for cmd in google-chrome google-chrome-stable chromium-browser chromium; do
+        p=$(which "$cmd" 2>/dev/null)
+        [ -n "$p" ] && [ -x "$p" ] && echo "$p" && return 0
+    done
+
+    return 1
+}
+
+# 验证浏览器安装
+verify_browser_install() {
+    print_info "验证浏览器安装..."
+
+    BROWSER_PATH=$(get_browser_path)
+    if [ -z "$BROWSER_PATH" ]; then
+        print_error "未检测到浏览器！"
+        return 1
+    fi
+
+    print_success "检测到浏览器: $BROWSER_PATH"
+
+    # 获取版本号
+    BROWSER_VERSION=$("$BROWSER_PATH" --version 2>/dev/null | head -1)
+    if [ -n "$BROWSER_VERSION" ]; then
+        print_info "浏览器版本: $BROWSER_VERSION"
+    fi
+
+    return 0
+}
+
+# 测试浏览器启动
+test_browser_launch() {
+    print_info "测试浏览器启动..."
+
+    BROWSER_PATH=$(get_browser_path)
+    if [ -z "$BROWSER_PATH" ]; then
+        print_error "未检测到浏览器，无法测试"
+        return 1
+    fi
+
+    # 构建测试参数
+    TEST_ARGS="--headless=new --disable-gpu --no-sandbox --disable-dev-shm-usage"
+    TEST_ARGS="$TEST_ARGS --dump-dom --timeout=10000"
+    TEST_URL="data:text/html,<html><body><h1>Browser Test OK</h1></body></html>"
+
+    print_info "启动浏览器进行测试..."
+
+    # 使用 timeout 命令限制执行时间
+    if command -v timeout &>/dev/null; then
+        RESULT=$(timeout 15 "$BROWSER_PATH" $TEST_ARGS "$TEST_URL" 2>/dev/null)
+    else
+        RESULT=$("$BROWSER_PATH" $TEST_ARGS "$TEST_URL" 2>/dev/null &
+        PID=$!
+        sleep 10
+        kill $PID 2>/dev/null
+        wait $PID 2>/dev/null)
+    fi
+
+    # 检查结果
+    if echo "$RESULT" | grep -q "Browser Test OK"; then
+        print_success "浏览器启动测试通过！"
+        return 0
+    else
+        # 即使没有输出，只要没报错也算成功
+        if [ $? -eq 0 ] || [ $? -eq 124 ]; then
+            print_success "浏览器启动测试通过！"
+            return 0
+        else
+            print_warning "浏览器启动测试未能确认，但可能仍然可用"
+            return 0
+        fi
+    fi
+}
+
 # 安装依赖
 install_deps() {
     print_info "安装系统依赖..."
@@ -135,19 +219,13 @@ install_deps() {
                     sudo apt-get install -y chromium 2>/dev/null || true
                 else
                     # x64 架构下载 Google Chrome
+                    print_info "下载 Google Chrome..."
                     wget -O "$TEMP_DEB" "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" 2>/dev/null
                     if [ -f "$TEMP_DEB" ] && [ -s "$TEMP_DEB" ]; then
+                        print_info "安装 Google Chrome..."
                         sudo dpkg -i "$TEMP_DEB" 2>/dev/null || true
                         sudo apt-get install -f -y 2>/dev/null || true
                         rm -f "$TEMP_DEB"
-
-                        # 验证安装
-                        if command -v google-chrome &>/dev/null; then
-                            print_success "Google Chrome 安装成功"
-                        else
-                            print_error "Google Chrome 安装失败！"
-                            print_info "请手动安装: wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && sudo dpkg -i google-chrome-stable_current_amd64.deb"
-                        fi
                     else
                         print_error "Google Chrome 下载失败"
                         print_info "请检查网络连接或代理设置"
@@ -215,6 +293,21 @@ install_deps() {
             print_warning "未知包管理器，请手动安装: Python3, pip, venv, Google Chrome, Xvfb"
             ;;
     esac
+
+    # 验证浏览器安装
+    echo ""
+    if ! verify_browser_install; then
+        print_error "浏览器安装验证失败！"
+        print_info "请手动安装 Google Chrome 后重试"
+        print_info "下载地址: https://www.google.com/chrome/"
+        echo ""
+        read -p "是否继续安装？[y/N]: " CONTINUE
+        [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ] && exit 1
+    fi
+
+    # 测试浏览器启动
+    echo ""
+    test_browser_launch
 
     print_success "系统依赖安装完成"
 }

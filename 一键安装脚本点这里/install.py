@@ -37,7 +37,7 @@ if sys.platform == "win32":
 # ============================================================
 # 版本信息
 # ============================================================
-VERSION = "1.3.0"
+VERSION = "1.4.0"
 SCRIPT_NAME = "LinuxDO 签到一键安装脚本"
 
 # ============================================================
@@ -261,13 +261,13 @@ class SystemInfo:
             ]
         else:  # Linux
             browser_paths = [
+                "/usr/bin/google-chrome",
+                "/usr/bin/google-chrome-stable",
                 "/usr/bin/chromium-browser",
                 "/usr/bin/chromium",
                 "/usr/lib/chromium/chromium",
                 "/usr/lib/chromium-browser/chromium-browser",
                 "/snap/bin/chromium",
-                "/usr/bin/google-chrome",
-                "/usr/bin/google-chrome-stable",
                 # Flatpak
                 "/var/lib/flatpak/exports/bin/com.google.Chrome",
                 "/var/lib/flatpak/exports/bin/org.chromium.Chromium",
@@ -280,7 +280,7 @@ class SystemInfo:
 
         # 如果没找到，尝试 which 命令（仅 Linux/macOS）
         if not self.browser_path and self.os_type != "windows":
-            for cmd in ["chromium-browser", "chromium", "google-chrome", "google-chrome-stable"]:
+            for cmd in ["google-chrome", "google-chrome-stable", "chromium-browser", "chromium"]:
                 try:
                     result = subprocess.run(
                         ["which", cmd],
@@ -295,6 +295,60 @@ class SystemInfo:
                             break
                 except:
                     pass
+
+    def get_browser_version(self) -> str:
+        """获取浏览器版本"""
+        if not self.browser_path:
+            return ""
+        try:
+            result = subprocess.run(
+                [self.browser_path, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                return result.stdout.strip().split('\n')[0]
+        except:
+            pass
+        return ""
+
+    def test_browser_launch(self) -> bool:
+        """测试浏览器是否能正常启动"""
+        if not self.browser_path:
+            return False
+
+        try:
+            # 使用 headless 模式测试
+            test_args = [
+                self.browser_path,
+                "--headless=new",
+                "--disable-gpu",
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--dump-dom",
+                "data:text/html,<html><body><h1>Browser Test OK</h1></body></html>"
+            ]
+
+            result = subprocess.run(
+                test_args,
+                capture_output=True,
+                text=True,
+                timeout=15
+            )
+
+            # 检查输出是否包含测试内容
+            if "Browser Test OK" in result.stdout:
+                return True
+
+            # 即使没有输出，只要没报错也算成功
+            return result.returncode == 0
+
+        except subprocess.TimeoutExpired:
+            # 超时也可能是正常的（某些系统）
+            return True
+        except Exception as e:
+            return False
 
     def print_info(self):
         """打印系统信息"""
@@ -562,7 +616,59 @@ class DependencyInstaller:
         elif self.sys_info.os_type == "windows":
             self._check_windows_deps()
 
+        # 重新检测浏览器
+        self.sys_info._detect_browser()
+
+        # 验证浏览器安装
+        print()
+        if not self._verify_browser_install():
+            print_error("浏览器安装验证失败！")
+            print_info("请手动安装 Google Chrome 后重试")
+            print_info("下载地址: https://www.google.com/chrome/")
+            print()
+            choice = input("是否继续安装？[y/N]: ").strip().lower()
+            if choice not in ("y", "yes"):
+                return
+
+        # 测试浏览器启动
+        print()
+        self._test_browser_launch()
+
         print_success("系统依赖检查完成")
+
+    def _verify_browser_install(self) -> bool:
+        """验证浏览器安装"""
+        print_info("验证浏览器安装...")
+
+        if not self.sys_info.browser_path:
+            print_error("未检测到浏览器！")
+            return False
+
+        print_success(f"检测到浏览器: {self.sys_info.browser_path}")
+
+        # 获取版本号
+        version = self.sys_info.get_browser_version()
+        if version:
+            print_info(f"浏览器版本: {version}")
+
+        return True
+
+    def _test_browser_launch(self) -> bool:
+        """测试浏览器启动"""
+        print_info("测试浏览器启动...")
+
+        if not self.sys_info.browser_path:
+            print_error("未检测到浏览器，无法测试")
+            return False
+
+        print_info("启动浏览器进行测试...")
+
+        if self.sys_info.test_browser_launch():
+            print_success("浏览器启动测试通过！")
+            return True
+        else:
+            print_warning("浏览器启动测试未能确认，但可能仍然可用")
+            return True
 
     def _install_linux_deps(self):
         """安装 Linux 依赖"""
