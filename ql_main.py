@@ -19,13 +19,30 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from core.checkin import Checkin
+from version import __version__
+
+
+def check_update_silent():
+    """静默检查更新（仅显示提示，不阻塞）"""
+    try:
+        from updater import check_update
+        update_info = check_update(silent=True)
+        if update_info:
+            print(f"[提示] 发现新版本 v{update_info['latest_version']}，请手动更新")
+            print(f"[提示] 更新命令: git pull origin main")
+            print()
+    except:
+        pass
 
 
 def main():
     """青龙面板入口"""
     print("=" * 50)
-    print("LinuxDO 签到 - 青龙面板模式")
+    print(f"LinuxDO 签到 - 青龙面板模式 v{__version__}")
     print("=" * 50)
+
+    # 静默检查更新（不阻塞）
+    check_update_silent()
 
     # 打印环境变量配置状态（不打印敏感信息）
     env_status = {
