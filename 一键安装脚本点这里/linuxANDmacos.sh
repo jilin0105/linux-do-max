@@ -92,16 +92,28 @@ detect_system() {
     GUI_DISPLAY="无"
     [ "$HAS_DISPLAY" = true ] && GUI_DISPLAY="有"
 
+    # 格式化输出函数（固定35字符宽度）
+    print_row() {
+        local label="$1"
+        local value="$2"
+        local line="│ $label $value"
+        # 计算需要填充的空格数（目标总宽度37字符）
+        local len=${#line}
+        local padding=$((36 - len))
+        [ $padding -lt 0 ] && padding=0
+        printf "%s%*s│\n" "$line" $padding ""
+    }
+
     echo ""
     echo "┌─────────────────────────────────────┐"
     echo "│        系统环境检测结果             │"
     echo "├─────────────────────────────────────┤"
-    printf "│ %-12s %-22s│\n" "操作系统" "$OS_NAME"
-    printf "│ %-12s %-22s│\n" "架构" "$ARCH ($ARCH_TYPE)"
-    [ -n "$DISTRO" ] && printf "│ %-12s %-22s│\n" "发行版" "$DISTRO"
-    [ -n "$PKG_MGR" ] && printf "│ %-12s %-22s│\n" "包管理器" "$PKG_MGR"
-    printf "│ %-12s %-22s│\n" "ARM设备" "$ARM_DISPLAY"
-    printf "│ %-12s %-22s│\n" "图形界面" "$GUI_DISPLAY"
+    print_row "操作系统  " "$OS_NAME"
+    print_row "架构      " "$ARCH ($ARCH_TYPE)"
+    [ -n "$DISTRO" ] && print_row "发行版    " "$DISTRO"
+    [ -n "$PKG_MGR" ] && print_row "包管理器  " "$PKG_MGR"
+    print_row "ARM设备   " "$ARM_DISPLAY"
+    print_row "图形界面  " "$GUI_DISPLAY"
     echo "└─────────────────────────────────────┘"
     echo ""
 }
