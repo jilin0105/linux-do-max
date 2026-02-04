@@ -36,6 +36,43 @@
 
 ## 更新日志
 
+### v0.4.1 (2026-02-04) - 一键安装脚本优化
+
+**改进内容：** 完善 Linux/macOS 一键安装流程，彻底解决浏览器兼容性问题
+
+**问题背景：**
+Ubuntu 22.04+ 默认的 `chromium-browser` 是 Snap 包，存在沙箱限制，导致 DrissionPage 无法正常控制浏览器。
+
+**解决方案：**
+1. **完全移除 Snap Chromium** - 不再检测和使用任何 Snap 版本的浏览器
+2. **使用 Google 官方 apt 源** - 通过官方源安装 Google Chrome，避免 Snap 问题
+3. **安装流程优化** - Python 环境配置完成后，自动验证浏览器并打开测试页面
+
+| 改进项 | 说明 |
+|--------|------|
+| 只使用 Google Chrome | 完全移除 Snap Chromium 检测，避免兼容性问题 |
+| 官方 apt 源安装 | 使用 Google 官方 apt 源安装 Chrome，更稳定 |
+| 浏览器验证流程 | Python 环境配置后自动验证浏览器安装 |
+| 可视化测试 | 浏览器测试改为打开 Google 首页（非无头模式） |
+| 配置文件优化 | 配置向导只检测 Google Chrome 路径 |
+
+**Chrome 安装方式（apt 源）：**
+```bash
+# 添加 Google 签名密钥
+wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
+
+# 添加 apt 源
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+
+# 安装
+sudo apt-get update && sudo apt-get install -y google-chrome-stable
+```
+
+**修改文件：**
+- `一键安装脚本点这里/linuxANDmacos.sh` - 浏览器检测和安装流程重构
+- `一键安装脚本点这里/install.py` - 同步更新 Chrome 安装方式
+- `core/browser.py` - `find_browser_path()` 只检测 Google Chrome
+
 ### v0.4.0 (2026-02-04) - 全平台浏览器支持重构
 
 **重大更新：** 彻底重写浏览器模块，解决 Linux/macOS 浏览器连接问题
