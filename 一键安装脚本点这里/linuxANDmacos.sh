@@ -106,21 +106,38 @@ detect_system() {
     echo ""
 }
 
-# 获取浏览器路径
+# 获取浏览器路径（只检测 Google Chrome，不检测 Snap Chromium）
 get_browser_path() {
-    # 按优先级检测浏览器
-    for p in /usr/bin/google-chrome /usr/bin/google-chrome-stable \
-             /usr/bin/chromium-browser /usr/bin/chromium /usr/lib/chromium/chromium \
-             /usr/lib/chromium-browser/chromium-browser /snap/bin/chromium \
-             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"; do
+    # 优先检测 Google Chrome
+    for p in /usr/bin/google-chrome /usr/bin/google-chrome-stable; do
         [ -x "$p" ] && echo "$p" && return 0
     done
 
-    # 尝试 which 命令
-    for cmd in google-chrome google-chrome-stable chromium-browser chromium; do
+    # macOS
+    if [ -x "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ]; then
+        echo "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        return 0
+    fi
+
+    # 尝试 which 命令（只找 google-chrome）
+    for cmd in google-chrome google-chrome-stable; do
         p=$(which "$cmd" 2>/dev/null)
         [ -n "$p" ] && [ -x "$p" ] && echo "$p" && return 0
     done
+
+    # ARM 设备：允许使用 apt 安装的 chromium（非 Snap）
+    if [ "$IS_ARM" = true ]; then
+        # 检查是否是 Snap 版本
+        for p in /usr/bin/chromium-browser /usr/bin/chromium; do
+            if [ -x "$p" ]; then
+                # 检查是否是 Snap 符号链接
+                if ! readlink -f "$p" 2>/dev/null | grep -q "snap"; then
+                    echo "$p"
+                    return 0
+                fi
+            fi
+        done
+    fi
 
     return 1
 }
@@ -294,22 +311,35 @@ install_deps() {
             ;;
     esac
 
-    # 验证浏览器安装
+    print_success "系统依赖安装完成"
+}
+
+# 验证并测试浏览器（在 Python 环境配置完成后调用）
+verify_and_test_browser() {
     echo ""
+    print_info "========== 浏览器验证 =========="
+    echo ""
+
+    # 验证浏览器安装
     if ! verify_browser_install; then
-        print_error "浏览器安装验证失败！"
-        print_info "请手动安装 Google Chrome 后重试"
-        print_info "下载地址: https://www.google.com/chrome/"
+        print_error "未检测到 Google Chrome！"
+        print_info "Snap 版 Chromium 不支持，必须安装 Google Chrome"
+        echo ""
+        print_info "请手动安装 Google Chrome:"
+        echo "  wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb"
+        echo "  sudo dpkg -i google-chrome-stable_current_amd64.deb"
+        echo "  sudo apt-get install -f -y"
         echo ""
         read -p "是否继续安装？[y/N]: " CONTINUE
-        [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ] && exit 1
+        [ "$CONTINUE" != "y" ] && [ "$CONTINUE" != "Y" ] && return 1
+        return 0
     fi
 
     # 测试浏览器启动
     echo ""
     test_browser_launch
-
-    print_success "系统依赖安装完成"
+    echo ""
+    return 0
 }
 
 # Python 环境
@@ -691,7 +721,7 @@ main_menu() {
 
         case $choice in
             0) exit 0 ;;
-            1) install_deps; setup_python; interactive_config; setup_cron; first_login; print_completion ;;
+            1) install_deps; setup_python; verify_and_test_browser; interactive_config; setup_cron; first_login; print_completion ;;
             2) install_deps ;;
             3) setup_python ;;
             4) edit_config ;;

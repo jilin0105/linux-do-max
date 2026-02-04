@@ -245,7 +245,7 @@ class SystemInfo:
             self.has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
 
     def _detect_browser(self):
-        """检测浏览器路径"""
+        """检测浏览器路径（只检测 Google Chrome，不检测 Snap Chromium）"""
         browser_paths = []
 
         if self.os_type == "windows":
@@ -257,20 +257,11 @@ class SystemInfo:
         elif self.os_type == "macos":
             browser_paths = [
                 "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-                "/Applications/Chromium.app/Contents/MacOS/Chromium",
             ]
-        else:  # Linux
+        else:  # Linux - 只检测 Google Chrome
             browser_paths = [
                 "/usr/bin/google-chrome",
                 "/usr/bin/google-chrome-stable",
-                "/usr/bin/chromium-browser",
-                "/usr/bin/chromium",
-                "/usr/lib/chromium/chromium",
-                "/usr/lib/chromium-browser/chromium-browser",
-                "/snap/bin/chromium",
-                # Flatpak
-                "/var/lib/flatpak/exports/bin/com.google.Chrome",
-                "/var/lib/flatpak/exports/bin/org.chromium.Chromium",
             ]
 
         for path in browser_paths:
@@ -278,9 +269,9 @@ class SystemInfo:
                 self.browser_path = path
                 break
 
-        # 如果没找到，尝试 which 命令（仅 Linux/macOS）
+        # 如果没找到，尝试 which 命令（仅 Linux/macOS，只找 google-chrome）
         if not self.browser_path and self.os_type != "windows":
-            for cmd in ["google-chrome", "google-chrome-stable", "chromium-browser", "chromium"]:
+            for cmd in ["google-chrome", "google-chrome-stable"]:
                 try:
                     result = subprocess.run(
                         ["which", cmd],
@@ -295,6 +286,19 @@ class SystemInfo:
                             break
                 except:
                     pass
+
+        # ARM 设备：允许使用 apt 安装的 chromium（非 Snap）
+        if not self.browser_path and self.is_arm and self.os_type == "linux":
+            for path in ["/usr/bin/chromium-browser", "/usr/bin/chromium"]:
+                if os.path.exists(path) and os.access(path, os.X_OK):
+                    # 检查是否是 Snap 符号链接
+                    try:
+                        real_path = os.path.realpath(path)
+                        if "snap" not in real_path:
+                            self.browser_path = path
+                            break
+                    except:
+                        pass
 
     def get_browser_version(self) -> str:
         """获取浏览器版本"""
@@ -616,25 +620,7 @@ class DependencyInstaller:
         elif self.sys_info.os_type == "windows":
             self._check_windows_deps()
 
-        # 重新检测浏览器
-        self.sys_info._detect_browser()
-
-        # 验证浏览器安装
-        print()
-        if not self._verify_browser_install():
-            print_error("浏览器安装验证失败！")
-            print_info("请手动安装 Google Chrome 后重试")
-            print_info("下载地址: https://www.google.com/chrome/")
-            print()
-            choice = input("是否继续安装？[y/N]: ").strip().lower()
-            if choice not in ("y", "yes"):
-                return
-
-        # 测试浏览器启动
-        print()
-        self._test_browser_launch()
-
-        print_success("系统依赖检查完成")
+        print_success("系统依赖安装完成"))
 
     def _verify_browser_install(self) -> bool:
         """验证浏览器安装"""
@@ -1249,20 +1235,64 @@ class Installer:
         python_path = self.dep_installer.setup_python_env()
         print()
 
-        # 3. 交互式配置
+        # 3. 验证并测试浏览器
+        self._verify_and_test_browser()
+        print()
+
+        # 4. 交互式配置
         self._interactive_config()
         print()
 
-        # 4. 设置定时任务
+        # 5. 设置定时任务
         self.cron_manager.setup()
         print()
 
-        # 5. 首次登录
+        # 6. 首次登录
         self.first_login()
         print()
 
-        # 6. 完成
+        # 7. 完成
         self._print_completion()
+
+    def _verify_and_test_browser(self):
+        """验证并测试浏览器"""
+        print()
+        print_step("========== 浏览器验证 ==========")
+        print()
+
+        # 重新检测浏览器
+        self.sys_info._detect_browser()
+
+        if not self.sys_info.browser_path:
+            print_error("未检测到 Google Chrome！")
+            print_info("Snap 版 Chromium 不支持，必须安装 Google Chrome")
+            print()
+            print_info("请手动安装 Google Chrome:")
+            if self.sys_info.os_type == "linux":
+                print("  wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb")
+                print("  sudo dpkg -i google-chrome-stable_current_amd64.deb")
+                print("  sudo apt-get install -f -y")
+            else:
+                print("  下载地址: https://www.google.com/chrome/")
+            print()
+            choice = input("是否继续安装？[y/N]: ").strip().lower()
+            if choice not in ("y", "yes"):
+                return
+        else:
+            print_success(f"检测到浏览器: {self.sys_info.browser_path}")
+
+            # 获取版本号
+            version = self.sys_info.get_browser_version()
+            if version:
+                print_info(f"浏览器版本: {version}")
+
+            # 测试浏览器启动
+            print()
+            print_info("测试浏览器启动...")
+            if self.sys_info.test_browser_launch():
+                print_success("浏览器启动测试通过！")
+            else:
+                print_warning("浏览器启动测试未能确认，但可能仍然可用")
 
     def _interactive_config(self):
         """交互式配置"""
