@@ -1,6 +1,7 @@
 """
 浏览器控制模块
 使用 DrissionPage 控制 Chrome 浏览器
+支持 Windows / macOS / Linux (x64/ARM) 全平台
 """
 import os
 import sys
@@ -18,6 +19,16 @@ def is_linux() -> bool:
     return platform.system().lower() == "linux"
 
 
+def is_macos() -> bool:
+    """检测是否为 macOS 系统"""
+    return platform.system().lower() == "darwin"
+
+
+def is_windows() -> bool:
+    """检测是否为 Windows 系统"""
+    return platform.system().lower() == "windows"
+
+
 def is_arm() -> bool:
     """检测是否为 ARM 架构"""
     machine = platform.machine().lower()
@@ -26,6 +37,8 @@ def is_arm() -> bool:
 
 def is_container() -> bool:
     """检测是否在容器环境中（Docker/LXC/Podman）"""
+    if not is_linux():
+        return False
     # Docker
     if os.path.exists("/.dockerenv"):
         return True
@@ -59,97 +72,193 @@ def is_container() -> bool:
 
 def is_root() -> bool:
     """检测是否以 root 用户运行"""
-    if is_linux():
+    if is_linux() or is_macos():
         return os.geteuid() == 0
+    return False
+
+
+def is_wsl() -> bool:
+    """检测是否在 WSL 环境中"""
+    if not is_linux():
+        return False
+    try:
+        with open("/proc/version", "r") as f:
+            content = f.read().lower()
+            return "microsoft" in content or "wsl" in content
+    except:
+        pass
+    return False
+
+
+def is_virtual_machine() -> bool:
+    """检测是否在虚拟机中"""
+    if not is_linux():
+        return False
+    try:
+        result = subprocess.run(
+            ["systemd-detect-virt"],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+        if result.returncode == 0:
+            virt = result.stdout.strip().lower()
+            if virt and virt != "none":
+                return True
+    except:
+        pass
+    # 检查 DMI 信息
+    try:
+        with open("/sys/class/dmi/id/product_name", "r") as f:
+            product = f.read().lower()
+            vm_keywords = ["vmware", "virtualbox", "kvm", "qemu", "hyper-v", "xen"]
+            for kw in vm_keywords:
+                if kw in product:
+                    return True
+    except:
+        pass
+    return False
+
+
+def has_display() -> bool:
+    """检测是否有图形显示环境"""
+    if is_windows():
+        return True
+    if is_macos():
+        return True
+    # Linux 检测 DISPLAY 或 WAYLAND_DISPLAY
+    if os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
+        return True
     return False
 
 
 def find_browser_path() -> str:
     """自动查找浏览器路径"""
-    if sys.platform == "win32":
+    if is_windows():
         paths = [
             os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
             os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
             os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
+            os.path.expandvars(r"%ProgramFiles%\Microsoft\Edge\Application\msedge.exe"),
         ]
-    elif sys.platform == "darwin":
+    elif is_macos():
         paths = [
             "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
             "/Applications/Chromium.app/Contents/MacOS/Chromium",
+            "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
         ]
     else:  # Linux
         paths = [
+            # Google Chrome (优先)
+            "/usr/bin/google-chrome",
+            "/usr/bin/google-chrome-stable",
+            "/opt/google/chrome/chrome",
+            # Chromium
             "/usr/bin/chromium-browser",
             "/usr/bin/chromium",
             "/usr/lib/chromium/chromium",
             "/usr/lib/chromium-browser/chromium-browser",
+            # Snap
             "/snap/bin/chromium",
-            "/usr/bin/google-chrome",
-            "/usr/bin/google-chrome-stable",
+            "/snap/bin/google-chrome",
             # Flatpak
             "/var/lib/flatpak/exports/bin/com.google.Chrome",
             "/var/lib/flatpak/exports/bin/org.chromium.Chromium",
+            # ARM 特殊路径
+            "/usr/lib/chromium-browser/chromium-browser-v7",
         ]
 
     for path in paths:
         if os.path.exists(path) and os.access(path, os.X_OK):
             return path
 
-    # 尝试 which 命令
-    for cmd in ["chromium-browser", "chromium", "google-chrome", "google-chrome-stable"]:
-        try:
-            result = subprocess.run(
-                ["which", cmd],
-                capture_output=True,
-                text=True,
-                timeout=5
-            )
-            if result.returncode == 0:
-                path = result.stdout.strip()
-                if path and os.path.exists(path):
-                    return path
-        except:
-            pass
+    # Linux/macOS: 尝试 which 命令
+    if not is_windows():
+        for cmd in ["google-chrome", "google-chrome-stable", "chromium-browser", "chromium"]:
+            try:
+                result = subprocess.run(
+                    ["which", cmd],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0:
+                    path = result.stdout.strip()
+                    if path and os.path.exists(path):
+                        return path
+            except:
+                pass
 
     return ""
 
 
-def get_linux_chrome_args() -> List[str]:
-    """获取 Linux 系统需要的 Chrome 启动参数"""
+def get_chrome_args() -> List[str]:
+    """获取 Chrome 启动参数（跨平台）"""
     args = []
 
-    # Linux 系统通常需要 --no-sandbox（特别是 root 用户或容器环境）
-    if is_linux():
-        # root 用户必须使用 --no-sandbox
-        if is_root():
-            args.append("--no-sandbox")
-            print("[浏览器] 检测到 root 用户，添加 --no-sandbox")
-        # 容器环境需要 --no-sandbox
-        elif is_container():
-            args.append("--no-sandbox")
-            print("[浏览器] 检测到容器环境，添加 --no-sandbox")
-        else:
-            # 普通 Linux 用户也建议添加，避免权限问题
-            # 很多 Linux 发行版的 Chromium 默认需要此参数
-            args.append("--no-sandbox")
+    # ===== 通用参数 =====
+    args.append("--disable-blink-features=AutomationControlled")
+    args.append("--no-first-run")
+    args.append("--no-default-browser-check")
+    args.append("--disable-infobars")
+    args.append("--disable-popup-blocking")
 
-        # 禁用 /dev/shm 使用（在某些环境下 /dev/shm 太小会导致崩溃）
+    # ===== Linux 专用参数 =====
+    if is_linux():
+        # --no-sandbox: Linux 几乎必须
+        # root 用户、容器、虚拟机、WSL 都需要
+        args.append("--no-sandbox")
+
+        # 禁用 /dev/shm（共享内存）
+        # 很多 Linux 环境 /dev/shm 太小会导致崩溃
         args.append("--disable-dev-shm-usage")
 
-        # 禁用 GPU（在无 GPU 或虚拟机环境下避免问题）
+        # 禁用 GPU（虚拟机/无 GPU 环境）
         args.append("--disable-gpu")
 
-        # 禁用软件光栅化（减少资源占用）
+        # 禁用软件光栅化
         args.append("--disable-software-rasterizer")
 
-        # 远程调试端口（DrissionPage 需要通过此端口连接浏览器）
-        args.append("--remote-debugging-port=9222")
+        # 单进程模式（某些环境下更稳定）
+        # args.append("--single-process")  # 可能导致问题，暂不启用
 
-        # 禁用扩展（避免扩展干扰）
+        # 禁用扩展
         args.append("--disable-extensions")
 
-        # 禁用后台网络服务（减少资源占用）
+        # 禁用后台网络服务
         args.append("--disable-background-networking")
+
+        # 禁用默认应用检查
+        args.append("--disable-default-apps")
+
+        # 禁用同步
+        args.append("--disable-sync")
+
+        # 禁用翻译
+        args.append("--disable-translate")
+
+        # 禁用后台定时器节流
+        args.append("--disable-background-timer-throttling")
+
+        # 禁用渲染器后台化
+        args.append("--disable-renderer-backgrounding")
+
+        # 禁用 IPC 洪水保护（避免连接断开）
+        args.append("--disable-ipc-flooding-protection")
+
+        # 虚拟机/WSL 额外参数
+        if is_virtual_machine() or is_wsl():
+            args.append("--disable-features=VizDisplayCompositor")
+
+    # ===== macOS 专用参数 =====
+    elif is_macos():
+        # macOS 通常不需要 --no-sandbox
+        # 但某些情况下可能需要
+        if is_root():
+            args.append("--no-sandbox")
+
+        args.append("--disable-gpu")
+        args.append("--disable-extensions")
 
     return args
 
@@ -159,11 +268,46 @@ class Browser:
 
     def __init__(self):
         self.page: Optional[ChromiumPage] = None
+        self._port = 9222  # 默认调试端口
 
     def _setup_user_data_dir(self):
         """确保用户数据目录存在"""
         user_data_dir = Path(config.user_data_dir)
         user_data_dir.mkdir(parents=True, exist_ok=True)
+
+    def _find_free_port(self) -> int:
+        """查找可用端口"""
+        import socket
+        for port in range(9222, 9322):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('127.0.0.1', port))
+                    return port
+            except OSError:
+                continue
+        return 9222  # 默认返回 9222
+
+    def _kill_existing_chrome(self):
+        """关闭可能存在的 Chrome 进程（避免端口冲突）"""
+        if is_linux() or is_macos():
+            try:
+                # 查找占用调试端口的进程
+                result = subprocess.run(
+                    ["lsof", "-ti", f":{self._port}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    pids = result.stdout.strip().split('\n')
+                    for pid in pids:
+                        try:
+                            subprocess.run(["kill", "-9", pid], timeout=5)
+                        except:
+                            pass
+                    time.sleep(1)
+            except:
+                pass
 
     def _create_options(self) -> ChromiumOptions:
         """创建浏览器选项"""
@@ -184,42 +328,54 @@ class Browser:
         if browser_path:
             co.set_browser_path(browser_path)
             print(f"[浏览器] 使用浏览器: {browser_path}")
+        else:
+            print("[浏览器] 警告: 未找到浏览器，将使用系统默认")
 
-        # 基本选项
-        co.set_argument("--disable-blink-features=AutomationControlled")
-        co.set_argument("--no-first-run")
-        co.set_argument("--no-default-browser-check")
-        co.set_argument("--disable-infobars")
-
-        # Linux 系统自动添加必要参数
-        linux_args = get_linux_chrome_args()
-        for arg in linux_args:
+        # 获取跨平台 Chrome 参数
+        chrome_args = get_chrome_args()
+        for arg in chrome_args:
             co.set_argument(arg)
 
-        # Linux 系统设置调试端口（DrissionPage 通过此端口连接浏览器）
-        if is_linux():
-            co.set_local_port(9222)
+        # Linux/macOS: 设置远程调试端口
+        if is_linux() or is_macos():
+            # 查找可用端口
+            self._port = self._find_free_port()
+            co.set_argument(f"--remote-debugging-port={self._port}")
+            co.set_local_port(self._port)
+            print(f"[浏览器] 调试端口: {self._port}")
 
-        # 用户自定义 Chrome 参数（如 --no-sandbox, --headless=new）
-        # 这些参数会覆盖自动添加的参数
+        # 用户自定义 Chrome 参数（最后添加，可覆盖默认）
         for arg in config.chrome_args:
             co.set_argument(arg)
 
         return co
 
-    def start(self) -> bool:
-        """启动浏览器"""
-        try:
-            # 确保用户数据目录存在
-            self._setup_user_data_dir()
+    def start(self, retry: int = 3) -> bool:
+        """启动浏览器（带重试机制）"""
+        for attempt in range(retry):
+            try:
+                # 确保用户数据目录存在
+                self._setup_user_data_dir()
 
-            options = self._create_options()
-            self.page = ChromiumPage(options)
-            print("[浏览器] 启动成功")
-            return True
-        except Exception as e:
-            print(f"[浏览器] 启动失败: {e}")
-            return False
+                # Linux/macOS: 清理可能占用端口的进程
+                if is_linux() or is_macos():
+                    self._kill_existing_chrome()
+
+                options = self._create_options()
+                self.page = ChromiumPage(options)
+                print("[浏览器] 启动成功")
+                return True
+            except Exception as e:
+                print(f"[浏览器] 启动失败 (尝试 {attempt + 1}/{retry}): {e}")
+                if attempt < retry - 1:
+                    # 等待后重试
+                    time.sleep(2)
+                    # 尝试使用不同端口
+                    if is_linux() or is_macos():
+                        self._port = self._find_free_port()
+
+        print("[浏览器] 启动失败，已达最大重试次数")
+        return False
 
     def quit(self):
         """关闭浏览器"""

@@ -21,7 +21,7 @@ from version import __version__
 
 
 def first_login():
-    """首次登录模式"""
+    """首次登录模式（全平台支持）"""
     print("=" * 50)
     print("首次登录模式")
     print("=" * 50)
@@ -33,11 +33,16 @@ def first_login():
     print("4. 之后运行签到将自动使用保存的登录状态")
     print()
 
-    # 启动浏览器（强制有头模式）
+    # 导入浏览器模块
     from DrissionPage import ChromiumPage, ChromiumOptions
     from pathlib import Path
-    import platform
-    from core.browser import get_linux_chrome_args, find_browser_path
+    import socket
+    import time
+    import subprocess
+    from core.browser import (
+        get_chrome_args, find_browser_path,
+        is_linux, is_macos
+    )
 
     # 用户数据目录
     user_data_dir = config.user_data_dir
@@ -47,6 +52,39 @@ def first_login():
     # 确保目录存在
     Path(user_data_dir).mkdir(parents=True, exist_ok=True)
 
+    # 查找可用端口
+    def find_free_port():
+        for port in range(9222, 9322):
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                    s.bind(('127.0.0.1', port))
+                    return port
+            except OSError:
+                continue
+        return 9222
+
+    # 清理占用端口的进程
+    def kill_port_process(port):
+        if is_linux() or is_macos():
+            try:
+                result = subprocess.run(
+                    ["lsof", "-ti", f":{port}"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    pids = result.stdout.strip().split('\n')
+                    for pid in pids:
+                        try:
+                            subprocess.run(["kill", "-9", pid], timeout=5)
+                        except:
+                            pass
+                    time.sleep(1)
+            except:
+                pass
+
+    # 创建浏览器选项
     co = ChromiumOptions()
 
     # 设置用户数据目录（保存登录状态）
@@ -59,44 +97,65 @@ def first_login():
     if browser_path:
         co.set_browser_path(browser_path)
         print(f"浏览器路径: {browser_path}")
+    else:
+        print("警告: 未找到浏览器，将使用系统默认")
 
     # 强制有头模式
     co.headless(False)
 
-    # 基本选项
-    co.set_argument("--disable-blink-features=AutomationControlled")
-    co.set_argument("--no-first-run")
-    co.set_argument("--no-default-browser-check")
-
-    # Linux 系统自动添加必要参数（关键修复！）
-    linux_args = get_linux_chrome_args()
-    for arg in linux_args:
+    # 获取跨平台 Chrome 参数
+    chrome_args = get_chrome_args()
+    for arg in chrome_args:
         co.set_argument(arg)
 
-    # Linux 系统设置调试端口（DrissionPage 通过此端口连接浏览器）
-    if platform.system().lower() == "linux":
-        co.set_local_port(9222)
+    # Linux/macOS: 设置远程调试端口
+    port = 9222
+    if is_linux() or is_macos():
+        kill_port_process(9222)
+        port = find_free_port()
+        co.set_argument(f"--remote-debugging-port={port}")
+        co.set_local_port(port)
+        print(f"调试端口: {port}")
 
-    # 用户自定义 Chrome 参数（如 --no-sandbox, --headless=new）
+    # 用户自定义 Chrome 参数
     for arg in config.chrome_args:
         co.set_argument(arg)
 
+    print()
     print("正在启动浏览器...")
-    try:
-        page = ChromiumPage(co)
-    except Exception as e:
-        print(f"❌ 浏览器启动失败: {e}")
+
+    # 带重试的启动
+    page = None
+    for attempt in range(3):
+        try:
+            page = ChromiumPage(co)
+            print("[浏览器] 启动成功")
+            break
+        except Exception as e:
+            print(f"[浏览器] 启动失败 (尝试 {attempt + 1}/3): {e}")
+            if attempt < 2:
+                time.sleep(2)
+                if is_linux() or is_macos():
+                    port = find_free_port()
+                    co.set_argument(f"--remote-debugging-port={port}")
+                    co.set_local_port(port)
+
+    if not page:
+        print()
+        print("❌ 浏览器启动失败")
         print()
         print("可能的解决方案：")
-        print("1. 确保已安装 Chromium 或 Chrome 浏览器")
-        print("   Ubuntu/Debian: sudo apt install chromium-browser")
+        print("1. 确保已安装 Chrome 或 Chromium 浏览器")
+        print("   Ubuntu/Debian: sudo apt install google-chrome-stable")
         print("   Fedora/RHEL:   sudo dnf install chromium")
         print("   Arch:          sudo pacman -S chromium")
+        print("   macOS:         brew install --cask google-chrome")
         print()
         print("2. 如果仍然失败，尝试在 config.yaml 中添加：")
         print("   chrome_args:")
         print('     - "--no-sandbox"')
         print('     - "--disable-dev-shm-usage"')
+        print('     - "--disable-gpu"')
         print()
         return
 

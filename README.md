@@ -36,6 +36,41 @@
 
 ## 更新日志
 
+### v0.4.0 (2026-02-04) - 全平台浏览器支持重构
+
+**重大更新：** 彻底重写浏览器模块，解决 Linux/macOS 浏览器连接问题
+
+| 新增功能 | 说明 |
+|----------|------|
+| 全平台支持 | Windows / macOS / Linux (x64/ARM) 统一处理 |
+| 自动端口检测 | 自动查找可用调试端口，避免端口冲突 |
+| 进程清理 | 启动前自动清理占用端口的进程 |
+| 重试机制 | 浏览器启动失败自动重试 3 次 |
+| 环境检测 | 自动检测虚拟机、WSL、容器环境 |
+
+| 新增检测函数 | 说明 |
+|--------------|------|
+| `is_macos()` | 检测 macOS 系统 |
+| `is_windows()` | 检测 Windows 系统 |
+| `is_wsl()` | 检测 WSL 环境 |
+| `is_virtual_machine()` | 检测虚拟机环境 |
+| `has_display()` | 检测图形显示环境 |
+
+| Linux 自动添加参数 | 说明 |
+|--------------------|------|
+| `--no-sandbox` | 所有 Linux 环境 |
+| `--disable-dev-shm-usage` | 避免共享内存问题 |
+| `--disable-gpu` | 虚拟机/无 GPU 环境 |
+| `--disable-software-rasterizer` | 减少资源占用 |
+| `--disable-extensions` | 避免扩展干扰 |
+| `--disable-background-networking` | 减少网络请求 |
+| `--disable-ipc-flooding-protection` | 避免连接断开 |
+| `--remote-debugging-port` | DrissionPage 连接必需 |
+
+**修改文件：**
+- `core/browser.py` - 完全重写，新增 15+ 个函数
+- `main.py` - `first_login()` 重写，支持全平台
+
 ### v0.3.9 (2026-02-04) - Linux 浏览器连接修复
 
 **修复问题：** Linux 系统 Chrome 浏览器打开后 DrissionPage 连接失败
