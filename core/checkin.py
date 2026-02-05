@@ -71,28 +71,63 @@ class Checkin:
             if not self.browser.start():
                 return self._finish(False)
 
+            # 启动后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] 浏览器启动完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
             # 2. 访问首页
             print("[签到] 访问 Linux.do 首页...")
             if not self.browser.goto(self.SITE_URL):
                 return self._finish(False)
+
+            # 首页加载后停留 5-8 秒
+            wait = random.uniform(5, 8)
+            print(f"[签到] 首页加载完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
 
             # 3. 等待 CF 验证
             if not self.browser.wait_for_cf():
                 print("[签到] CF 验证失败")
                 return self._finish(False)
 
+            # CF 验证后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] CF 验证通过，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
             # 4. 检查登录状态
             if not self._check_login():
                 return self._finish(False)
 
+            # 登录检查后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] 登录状态确认，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
             # 5. 获取用户信息
             self._get_user_info()
+
+            # 获取用户信息后停留 5-8 秒
+            wait = random.uniform(5, 8)
+            print(f"[签到] 用户信息获取完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
 
             # 6. 浏览帖子
             self._browse_posts()
 
+            # 浏览帖子后停留 5-10 秒
+            wait = random.uniform(5, 10)
+            print(f"[签到] 帖子浏览完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
             # 7. 获取升级进度
             self._get_progress()
+
+            # 获取进度后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] 进度获取完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
 
             # 8. 完成
             return self._finish(True)
@@ -190,13 +225,28 @@ class Checkin:
         print("[签到] 获取用户信息...")
 
         try:
+            # 访问前停留 2-4 秒
+            wait = random.uniform(2, 4)
+            print(f"[签到] 准备访问 Connect 页面，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
             # 直接从 connect.linux.do 获取等级（更可靠）
             self.browser.goto(self.CONNECT_URL, wait=3)
+
+            # 页面加载后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] Connect 页面加载中，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
 
             # 等待 CF 验证
             if not self.browser.wait_for_cf(timeout=60):
                 print("[签到] Connect 页面 CF 验证失败")
                 return
+
+            # CF 验证后停留 2-4 秒
+            wait = random.uniform(2, 4)
+            print(f"[签到] CF 验证通过，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
 
             # 从页面 HTML 解析等级
             # 格式: "你好，用户名 (username) 2级用户"
@@ -220,6 +270,11 @@ class Checkin:
         """浏览帖子（随机浏览，优先评论多的帖子）"""
         print(f"[签到] 开始浏览帖子，目标: {config.browse_count} 篇")
 
+        # 开始浏览前停留 3-5 秒
+        wait = random.uniform(3, 5)
+        print(f"[签到] 准备获取帖子列表，等待 {wait:.1f} 秒...")
+        time.sleep(wait)
+
         # 随机获取帖子（优先评论多的）
         posts = self._get_random_posts_with_replies()
         if not posts:
@@ -227,6 +282,11 @@ class Checkin:
             return
 
         print(f"[签到] 获取到 {len(posts)} 个帖子（按评论数排序后随机选取）")
+
+        # 获取帖子列表后停留 3-5 秒
+        wait = random.uniform(3, 5)
+        print(f"[签到] 帖子列表获取完成，等待 {wait:.1f} 秒...")
+        time.sleep(wait)
 
         # 浏览帖子
         browse_count = min(config.browse_count, len(posts))
@@ -239,8 +299,18 @@ class Checkin:
             reply_count = post_info.get('replies', 0)
             print(f"[签到] 浏览帖子 {i + 1}/{browse_count} (评论:{reply_count}): {post_url}")
 
+            # 访问帖子前停留 2-4 秒
+            wait = random.uniform(2, 4)
+            print(f"[签到] 准备访问帖子，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
             if not self.browser.goto(post_url, wait=2):
                 continue
+
+            # 帖子加载后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] 帖子加载完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
 
             # 检查 CF 403（403 是 CF 5秒盾触发的前提）
             if self.browser.check_cf_403():
@@ -262,6 +332,11 @@ class Checkin:
             # 滑动浏览帖子（模拟真实阅读）
             self._scroll_post()
 
+            # 滑动完成后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] 阅读完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
             # 统计浏览
             self.stats['browse_count'] += 1
 
@@ -271,13 +346,19 @@ class Checkin:
 
             # 随机点赞
             if random.random() < config.like_probability:
+                # 点赞前停留 2-3 秒
+                wait = random.uniform(2, 3)
+                print(f"[签到] 准备点赞，等待 {wait:.1f} 秒...")
+                time.sleep(wait)
                 if self._like_post():
                     self.stats['like_count'] += 1
+                    # 点赞后停留 2-3 秒
+                    wait = random.uniform(2, 3)
+                    print(f"[签到] 点赞完成，等待 {wait:.1f} 秒...")
+                    time.sleep(wait)
 
-            # 浏览结束后停留（15-60秒，评论越多停留越久）
-            base_wait = 15
-            extra_wait = min(reply_count * 0.5, 45)  # 每条评论+0.5秒，最多+45秒
-            wait_time = base_wait + extra_wait + random.uniform(0, 10)
+            # 帖子停留时间（15-30秒，从配置读取，最高30秒）
+            wait_time = random.uniform(config.browse_interval_min, min(config.browse_interval_max, 30))
             print(f"[签到] 停留 {wait_time:.0f} 秒...")
             time.sleep(wait_time)
 

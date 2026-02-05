@@ -135,14 +135,30 @@ class Config:
     def browse_interval(self) -> tuple:
         """浏览间隔（秒），返回 (最小, 最大)"""
         try:
-            min_val = int(self.get("browse_interval_min", 3))
+            min_val = int(self.get("browse_interval_min", 15))
         except (ValueError, TypeError):
-            min_val = 3
+            min_val = 15
         try:
-            max_val = int(self.get("browse_interval_max", 8))
+            max_val = int(self.get("browse_interval_max", 30))
         except (ValueError, TypeError):
-            max_val = 8
+            max_val = 30
         return (min_val, max_val)
+
+    @property
+    def browse_interval_min(self) -> int:
+        """浏览间隔最小值（秒）"""
+        try:
+            return int(self.get("browse_interval_min", 15))
+        except (ValueError, TypeError):
+            return 15
+
+    @property
+    def browse_interval_max(self) -> int:
+        """浏览间隔最大值（秒）"""
+        try:
+            return int(self.get("browse_interval_max", 30))
+        except (ValueError, TypeError):
+            return 30
 
     # Telegram 配置（允许空字符串）
     @property

@@ -2046,8 +2046,8 @@ browse_count: 10
 like_probability: 0.3
 
 # 浏览间隔（秒）
-browse_interval_min: 3
-browse_interval_max: 8
+browse_interval_min: 15
+browse_interval_max: 30
 
 # ========== Telegram 通知 ==========
 # Bot Token（从 @BotFather 获取）
@@ -2069,8 +2069,8 @@ tg_chat_id: ""
 | chrome_args | 列表 | [] | Chrome 额外启动参数 |
 | browse_count | 整数 | 10 | 每次浏览帖子数量 |
 | like_probability | 浮点 | 0.3 | 点赞概率（0-1） |
-| browse_interval_min | 整数 | 3 | 浏览间隔最小秒数 |
-| browse_interval_max | 整数 | 8 | 浏览间隔最大秒数 |
+| browse_interval_min | 整数 | 15 | 浏览间隔最小秒数 |
+| browse_interval_max | 整数 | 30 | 浏览间隔最大秒数 |
 | tg_bot_token | 字符串 | 空 | Telegram Bot Token |
 | tg_chat_id | 字符串 | 空 | Telegram Chat ID |
 

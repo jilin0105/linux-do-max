@@ -412,8 +412,8 @@ class ConfigManager:
         "chrome_args": [],
         "browse_count": 10,
         "like_probability": 0.3,
-        "browse_interval_min": 3,
-        "browse_interval_max": 8,
+        "browse_interval_min": 15,
+        "browse_interval_max": 30,
         "tg_bot_token": "",
         "tg_chat_id": "",
     }

@@ -332,8 +332,8 @@ echo headless: %HEADLESS%
 echo browser_path: "%CHROME_PATH:\=/%"
 echo browse_count: %BROWSE_COUNT%
 echo like_probability: %LIKE_PROB%
-echo browse_interval_min: 3
-echo browse_interval_max: 8
+echo browse_interval_min: 15
+echo browse_interval_max: 30
 echo tg_bot_token: "%TG_TOKEN%"
 echo tg_chat_id: "%TG_CHAT_ID%"
 ) > config.yaml
