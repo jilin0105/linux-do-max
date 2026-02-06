@@ -7,12 +7,13 @@ LinuxDO 自动签到工具
 2. 方案B：青龙面板调用
 
 使用方法：
-    python main.py [--first-login] [--check-update] [--no-update-check]
+    python main.py [--first-login] [--check-update] [--no-update-check] [--clear-cache]
 
 参数：
     --first-login     首次登录模式，会打开有头浏览器等待手动登录
     --check-update    仅检查更新
     --no-update-check 跳过更新检查
+    --clear-cache     仅清理浏览器缓存（仅 Linux 生效）
 """
 import sys
 import argparse
@@ -232,6 +233,11 @@ def main():
         action="store_true",
         help="跳过更新检查"
     )
+    parser.add_argument(
+        "--clear-cache",
+        action="store_true",
+        help="仅清理浏览器缓存（仅 Linux 生效）"
+    )
     args = parser.parse_args()
 
     # 显示版本
@@ -242,6 +248,16 @@ def main():
     if args.check_update:
         from updater import prompt_update
         prompt_update()
+        return 0
+
+    # 仅清理缓存
+    if args.clear_cache:
+        from core.browser import clear_browser_cache, is_linux
+        if not is_linux():
+            print("[缓存清理] 此功能仅适用于 Linux 系统")
+            print("[缓存清理] Windows/macOS 不需要手动清理缓存")
+            return 0
+        clear_browser_cache()
         return 0
 
     # 启动时检查更新（仅交互模式）

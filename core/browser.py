@@ -6,6 +6,7 @@
 import os
 import sys
 import time
+import shutil
 import platform
 import subprocess
 from pathlib import Path
@@ -561,3 +562,129 @@ class Browser:
         except:
             pass
         return None
+
+
+def clear_browser_cache(user_data_dir: str = None) -> dict:
+    """
+    清理浏览器缓存（仅 Linux 系统）
+    用于节省容器/VPS 磁盘空间
+
+    清理内容：
+    - Cache: 网页缓存
+    - Code Cache: JavaScript 代码缓存
+    - GPUCache: GPU 缓存
+    - ShaderCache: 着色器缓存
+    - 临时文件: crash reports, blob_storage 等
+
+    参数:
+        user_data_dir: 用户数据目录，默认使用配置中的目录
+
+    返回:
+        dict: 清理结果统计
+    """
+    if not is_linux():
+        return {"skipped": True, "reason": "非 Linux 系统，跳过清理"}
+
+    if user_data_dir is None:
+        user_data_dir = config.user_data_dir
+
+    user_data_path = Path(user_data_dir)
+    if not user_data_path.exists():
+        return {"skipped": True, "reason": "用户数据目录不存在"}
+
+    result = {
+        "cleared": [],
+        "not_found": [],
+        "errors": [],
+        "freed_bytes": 0
+    }
+
+    # 需要清理的缓存目录
+    cache_dirs = [
+        "Default/Cache",           # 网页缓存
+        "Default/Code Cache",      # 代码缓存
+        "Default/GPUCache",        # GPU 缓存
+        "ShaderCache",             # 着色器缓存
+        "GrShaderCache",           # Skia 着色器缓存
+    ]
+
+    # 需要清理的临时文件/目录
+    temp_items = [
+        "Crashpad",                # 崩溃报告
+        "crash_reports",           # 崩溃报告
+        "Default/blob_storage",    # Blob 存储
+        "Default/Session Storage", # 会话存储（可选，不影响登录）
+        "Default/Service Worker",  # Service Worker 缓存
+        "BrowserMetrics",          # 浏览器指标
+        "Default/optimization_guide_hint_cache_store",  # 优化提示缓存
+    ]
+
+    def get_dir_size(path: Path) -> int:
+        """获取目录大小"""
+        total = 0
+        try:
+            for entry in path.rglob("*"):
+                if entry.is_file():
+                    try:
+                        total += entry.stat().st_size
+                    except:
+                        pass
+        except:
+            pass
+        return total
+
+    def safe_remove(path: Path, name: str) -> bool:
+        """安全删除目录或文件"""
+        try:
+            if path.is_dir():
+                size = get_dir_size(path)
+                shutil.rmtree(path)
+                result["freed_bytes"] += size
+                result["cleared"].append(name)
+                return True
+            elif path.is_file():
+                size = path.stat().st_size
+                path.unlink()
+                result["freed_bytes"] += size
+                result["cleared"].append(name)
+                return True
+        except Exception as e:
+            result["errors"].append(f"{name}: {e}")
+        return False
+
+    print("[缓存清理] 开始清理浏览器缓存...")
+
+    # 清理缓存目录
+    for cache_dir in cache_dirs:
+        cache_path = user_data_path / cache_dir
+        if cache_path.exists():
+            safe_remove(cache_path, cache_dir.split("/")[-1])
+        else:
+            result["not_found"].append(cache_dir.split("/")[-1])
+
+    # 清理临时文件
+    for temp_item in temp_items:
+        temp_path = user_data_path / temp_item
+        if temp_path.exists():
+            safe_remove(temp_path, temp_item.split("/")[-1])
+
+    # 输出结果
+    if result["cleared"]:
+        for item in result["cleared"]:
+            print(f"[缓存清理] 🗑️ 已清理: {item}")
+
+    if not result["cleared"] and not result["errors"]:
+        print("[缓存清理] ✨ 没有发现需要清理的缓存")
+
+    if result["errors"]:
+        for err in result["errors"]:
+            print(f"[缓存清理] ⚠️ 清理失败: {err}")
+
+    # 显示释放空间
+    freed_mb = result["freed_bytes"] / (1024 * 1024)
+    if freed_mb >= 0.01:
+        print(f"[缓存清理] 🎉 清理完成！释放空间: {freed_mb:.2f} MB")
+    else:
+        print("[缓存清理] 🎉 清理完成！")
+
+    return result

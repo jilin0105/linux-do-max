@@ -65,3 +65,10 @@ tg_bot_token: ""
 
 # Chat ID（从 @userinfobot 获取）
 tg_chat_id: ""
+
+# ========== 缓存清理（仅 Linux）==========
+# 签到完成后自动清理浏览器缓存
+# 适用于容器、VPS 等磁盘空间有限的环境
+# Windows/macOS 不需要，会自动跳过
+# 默认: true
+auto_clear_cache: true

@@ -36,6 +36,34 @@
 
 ## 更新日志
 
+### v0.5.2 (2026-02-06) - 浏览器缓存清理
+
+**新增功能：** 为 Linux 容器/VPS 等磁盘空间有限的环境添加浏览器缓存清理功能
+
+| 功能 | 说明 |
+|------|------|
+| 自动清理 | 签到完成后自动清理浏览器缓存（仅 Linux） |
+| 手动清理 | `--clear-cache` 参数手动触发清理 |
+| 可配置 | `auto_clear_cache` 配置项控制是否自动清理 |
+
+**清理内容：**
+- Cache - 网页缓存
+- Code Cache - JavaScript 代码缓存
+- GPUCache - GPU 缓存
+- ShaderCache - 着色器缓存
+- 临时文件 - Crashpad、blob_storage 等
+
+**使用方式：**
+```bash
+# 手动清理缓存
+python main.py --clear-cache
+
+# 配置自动清理（config.yaml）
+auto_clear_cache: true  # 默认开启
+```
+
+**说明：** Windows/macOS 不需要此功能，会自动跳过。
+
 ### v0.4.1 (2026-02-04) - 一键安装脚本优化
 
 **改进内容：** 完善 Linux/macOS 一键安装流程，彻底解决浏览器兼容性问题

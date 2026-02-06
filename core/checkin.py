@@ -159,6 +159,13 @@ class Checkin:
         # 关闭浏览器
         self.browser.quit()
 
+        # Linux 系统自动清理缓存（节省容器/VPS 空间）
+        if config.auto_clear_cache:
+            from .browser import clear_browser_cache, is_linux
+            if is_linux():
+                print()
+                clear_browser_cache()
+
         return success
 
     def _check_login(self) -> bool:

@@ -174,6 +174,15 @@ class Config:
         """是否启用 Telegram 通知"""
         return bool(self.tg_bot_token and self.tg_chat_id)
 
+    # 缓存清理配置（仅 Linux）
+    @property
+    def auto_clear_cache(self) -> bool:
+        """是否在签到完成后自动清理缓存（仅 Linux 生效）"""
+        value = self.get("auto_clear_cache", True)
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() in ("true", "1", "yes")
+
 
 # 全局配置实例
 config = Config()
