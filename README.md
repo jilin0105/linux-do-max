@@ -36,6 +36,41 @@
 
 ## 更新日志
 
+### v0.5.3 (2026-02-06) - 缓存智能管理增强
+
+**新增功能：** Linux 系统签到后强制清理缓存 + 签到前磁盘空间预检查 + Chrome 缓存大小限制
+
+| 功能 | 说明 |
+|------|------|
+| 强制清理 | Linux 系统每次签到后必须清理缓存，不可关闭 |
+| 磁盘预检查 | 签到前检测磁盘空间，不足时先清理再启动浏览器 |
+| 缓存限制 | Chrome 启动参数限制缓存大小（容器 50MB / 普通 Linux 100MB） |
+| 手动清理 | `--clear-cache` 参数手动触发清理 |
+
+**清理内容（仅保留登录状态）：**
+- Cache - 网页缓存
+- Code Cache - JavaScript 代码缓存
+- GPUCache - GPU 缓存
+- ShaderCache - 着色器缓存
+- 临时文件 - Crashpad、blob_storage 等
+
+**新增配置项（config.yaml）：**
+```yaml
+# Chrome 缓存大小限制（MB），0 为自动（容器 50MB / 普通 Linux 100MB）
+cache_size_limit: 0
+
+# 磁盘空间告警阈值（MB），低于此值签到前自动清理，0 禁用
+disk_free_threshold: 500
+```
+
+**使用方式：**
+```bash
+# 手动清理缓存
+python main.py --clear-cache
+```
+
+**说明：** Linux 系统（Docker/VPS/ARM）签到后强制清理，Windows/macOS 自动跳过。
+
 ### v0.5.2 (2026-02-06) - 浏览器缓存清理
 
 **新增功能：** 为 Linux 容器/VPS 等磁盘空间有限的环境添加浏览器缓存清理功能
@@ -44,23 +79,6 @@
 |------|------|
 | 自动清理 | 签到完成后自动清理浏览器缓存（仅 Linux） |
 | 手动清理 | `--clear-cache` 参数手动触发清理 |
-| 可配置 | `auto_clear_cache` 配置项控制是否自动清理 |
-
-**清理内容：**
-- Cache - 网页缓存
-- Code Cache - JavaScript 代码缓存
-- GPUCache - GPU 缓存
-- ShaderCache - 着色器缓存
-- 临时文件 - Crashpad、blob_storage 等
-
-**使用方式：**
-```bash
-# 手动清理缓存
-python main.py --clear-cache
-
-# 配置自动清理（config.yaml）
-auto_clear_cache: true  # 默认开启
-```
 
 **说明：** Windows/macOS 不需要此功能，会自动跳过。
 

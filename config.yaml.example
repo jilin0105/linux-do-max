@@ -67,8 +67,20 @@ tg_bot_token: ""
 tg_chat_id: ""
 
 # ========== 缓存清理（仅 Linux）==========
-# 签到完成后自动清理浏览器缓存
-# 适用于容器、VPS 等磁盘空间有限的环境
-# Windows/macOS 不需要，会自动跳过
-# 默认: true
-auto_clear_cache: true
+# Linux 系统（容器/VPS）每次签到后强制清理浏览器缓存
+# 仅保留登录状态（Cookies/Local Storage），清除所有缓存和临时文件
+# 此行为不可关闭，确保低容量环境不会因缓存膨胀导致磁盘满
+# Windows/macOS 不受影响，自动跳过
+
+# Chrome 磁盘缓存大小限制（MB），仅 Linux 生效
+# 容器环境默认 50MB，普通 Linux 默认 100MB
+# 设为 0 使用上述默认值，设为其他正整数自定义限制
+# 默认: 0（自动）
+cache_size_limit: 0
+
+# 磁盘剩余空间告警阈值（MB），仅 Linux 生效
+# 签到前检测磁盘空间，低于此值时自动清理缓存再启动浏览器
+# 适用于小容量 VPS、Docker 容器等环境
+# 设为 0 禁用磁盘空间检查
+# 默认: 500
+disk_free_threshold: 500

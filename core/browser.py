@@ -233,6 +233,16 @@ def get_chrome_args() -> List[str]:
         # 禁用 IPC 洪水保护（避免连接断开）
         args.append("--disable-ipc-flooding-protection")
 
+        # 磁盘缓存大小限制
+        # 容器环境默认 50MB，普通 Linux 默认 100MB，配置为 0 则不限制
+        cache_limit = config.cache_size_limit
+        if cache_limit > 0:
+            args.append(f"--disk-cache-size={cache_limit * 1024 * 1024}")
+        elif is_container():
+            args.append("--disk-cache-size=52428800")   # 50MB
+        else:
+            args.append("--disk-cache-size=104857600")  # 100MB
+
         # 虚拟机/WSL 额外参数
         if is_virtual_machine() or is_wsl():
             args.append("--disable-features=VizDisplayCompositor")
@@ -562,6 +572,90 @@ class Browser:
         except:
             pass
         return None
+
+
+def get_disk_free_mb(path: str = None) -> int:
+    """获取磁盘剩余空间（MB）"""
+    if path is None:
+        path = config.user_data_dir
+    try:
+        stat = shutil.disk_usage(path)
+        return int(stat.free / (1024 * 1024))
+    except Exception:
+        return -1
+
+
+def get_cache_size_mb(user_data_dir: str = None) -> float:
+    """获取浏览器缓存目录总大小（MB）"""
+    if user_data_dir is None:
+        user_data_dir = config.user_data_dir
+    user_data_path = Path(user_data_dir)
+    if not user_data_path.exists():
+        return 0.0
+
+    cache_dirs = [
+        "Default/Cache", "Default/Code Cache", "Default/GPUCache",
+        "ShaderCache", "GrShaderCache",
+        "Crashpad", "crash_reports", "Default/blob_storage",
+        "Default/Session Storage", "Default/Service Worker",
+        "BrowserMetrics", "Default/optimization_guide_hint_cache_store",
+    ]
+    total = 0
+    for d in cache_dirs:
+        p = user_data_path / d
+        if p.exists():
+            try:
+                for entry in p.rglob("*"):
+                    if entry.is_file():
+                        try:
+                            total += entry.stat().st_size
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+    return total / (1024 * 1024)
+
+
+def check_disk_and_clean() -> bool:
+    """
+    签到前磁盘空间预检查（仅 Linux）
+    磁盘剩余空间低于阈值时自动清理缓存
+
+    返回:
+        True: 空间充足或清理后充足
+        False: 空间不足且清理后仍不足
+    """
+    if not is_linux():
+        return True
+
+    threshold = config.disk_free_threshold
+    if threshold <= 0:
+        return True
+
+    free_mb = get_disk_free_mb()
+    if free_mb < 0:
+        return True  # 无法检测时不阻塞
+
+    cache_mb = get_cache_size_mb()
+
+    if free_mb < threshold:
+        print(f"[磁盘检查] 剩余空间: {free_mb} MB（阈值: {threshold} MB）")
+        print(f"[磁盘检查] 浏览器缓存: {cache_mb:.1f} MB")
+        print(f"[磁盘检查] 空间不足，签到前自动清理缓存...")
+        clear_browser_cache()
+        # 清理后再次检查
+        free_after = get_disk_free_mb()
+        if free_after < 0:
+            return True
+        if free_after < threshold:
+            print(f"[磁盘检查] 清理后剩余: {free_after} MB，仍低于阈值")
+            print(f"[磁盘检查] 警告: 磁盘空间严重不足，签到可能失败")
+            return False
+        print(f"[磁盘检查] 清理后剩余: {free_after} MB，空间充足")
+        return True
+
+    # 空间充足时静默通过，不输出日志
+    return True
 
 
 def clear_browser_cache(user_data_dir: str = None) -> dict:

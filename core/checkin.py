@@ -67,6 +67,10 @@ class Checkin:
         print("=" * 50)
 
         try:
+            # 0. 磁盘空间预检查（仅 Linux，空间不足时先清理缓存）
+            from .browser import check_disk_and_clean
+            check_disk_and_clean()
+
             # 1. 启动浏览器
             if not self.browser.start():
                 return self._finish(False)
@@ -159,12 +163,12 @@ class Checkin:
         # 关闭浏览器
         self.browser.quit()
 
-        # Linux 系统自动清理缓存（节省容器/VPS 空间）
-        if config.auto_clear_cache:
-            from .browser import clear_browser_cache, is_linux
-            if is_linux():
-                print()
-                clear_browser_cache()
+        # Linux 系统强制清理缓存（容器/VPS 每次签到后必须清理）
+        # 仅保留登录状态，清除所有缓存和临时文件
+        from .browser import clear_browser_cache, is_linux
+        if is_linux():
+            print()
+            clear_browser_cache()
 
         return success
 

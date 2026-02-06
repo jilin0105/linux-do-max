@@ -175,13 +175,25 @@ class Config:
         return bool(self.tg_bot_token and self.tg_chat_id)
 
     # 缓存清理配置（仅 Linux）
+    # 注意：Linux 系统签到后强制清理缓存，无开关可关闭
+
     @property
-    def auto_clear_cache(self) -> bool:
-        """是否在签到完成后自动清理缓存（仅 Linux 生效）"""
-        value = self.get("auto_clear_cache", True)
-        if isinstance(value, bool):
-            return value
-        return str(value).lower() in ("true", "1", "yes")
+    def cache_size_limit(self) -> int:
+        """Chrome 磁盘缓存大小限制（MB），仅 Linux 生效，0 表示不限制"""
+        value = self.get("cache_size_limit", 0)
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return 0
+
+    @property
+    def disk_free_threshold(self) -> int:
+        """磁盘剩余空间告警阈值（MB），低于此值时签到前自动清理缓存"""
+        value = self.get("disk_free_threshold", 500)
+        try:
+            return int(value)
+        except (ValueError, TypeError):
+            return 500
 
 
 # 全局配置实例
