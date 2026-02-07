@@ -1,6 +1,6 @@
 # 版本信息
-__version__ = "0.5.4"
-__version_info__ = (0, 5, 4)
+__version__ = "1.0.0"
+__version_info__ = (1, 0, 0)
 
 # GitHub 仓库信息
 GITHUB_REPO = "xtgm/linux-do-max"

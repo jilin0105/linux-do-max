@@ -10,6 +10,15 @@
 - [功能特性](#功能特性)
 - [支持平台](#支持平台)
 - [一键安装](#一键安装)
+- [全平台详细安装指南](#全平台详细安装指南)
+  - [安装方式总览](#安装方式总览)
+  - [1. Windows 系统](#1-windows-系统)
+  - [2. macOS 系统](#2-macos-系统)
+  - [3. Linux 系统](#3-linux-系统ubuntudebiancentosfedoraarch)
+  - [4. Docker 部署（x86_64）](#4-docker-部署x86_64)
+  - [5. 青龙面板](#5-青龙面板)
+  - [6. ARM 设备](#6-arm-设备树莓派orange-pi电视盒子)
+  - [7. LXC 容器](#7-lxc-容器)
 - [快速开始](#快速开始)
 - [方案详解](#方案详解)
   - [方案A：Windows 任务计划](#方案awindows-任务计划)
@@ -35,6 +44,49 @@
 ---
 
 ## 更新日志
+
+### v1.0.0 (2026-02-07) - 全平台安装指南 + 文档重构
+
+**重大更新：** README.md 新增「全平台详细安装指南」章节，覆盖 7 大平台、27 种安装方式，每种方式均包含完整的操作步骤。
+
+**新增章节：全平台详细安装指南**
+
+| 平台 | 安装方式 | 说明 |
+|------|---------|------|
+| Windows | 4种 | Windows.cmd / install.py / 二进制 / 源码手动 |
+| macOS | 4种 | linuxANDmacos.sh / install.py / 二进制 / 源码手动 |
+| Linux (x64) | 5种 | linuxANDmacos.sh / install.py / 二进制 / 源码手动 / Docker |
+| Docker (x86_64) | 3部分 | docker-compose / 手动 build / 定时任务配置 |
+| 青龙面板 | 3部分 | Alpine 镜像 / Debian 镜像 / 环境变量配置 |
+| ARM 设备 | 6种 | setup_arm.sh / linuxANDmacos.sh / install.py / 二进制 / Docker ARM / 无图形界面方案 |
+| LXC 容器 | 3部分 | 二进制安装 / 源码安装 / 注意事项 |
+
+**每种安装方式包含 6 个标准要素：**
+1. 适用场景 — 一句话说明该方式适合谁
+2. 前置条件 — 需要预装什么
+3. 完整操作步骤 — 从下载到运行，每步都有命令
+4. 首次登录方式 — 明确说明如何完成首次登录
+5. 定时任务设置 — 具体命令或脚本引用
+6. 常见问题 — 该平台特有的问题和解决方法
+
+**安装方式总览对比表：**
+- 一键对比所有平台支持的安装方式（一键脚本 / Python 脚本 / 二进制 / 源码 / Docker）
+- 每种方式标注推荐度
+- 选择建议：个人电脑 → 一键脚本、VPS → 二进制、LXC → 二进制、Docker → docker-compose、ARM → setup_arm.sh
+
+**文档结构优化：**
+- 目录新增「全平台详细安装指南」及 7 个子章节链接
+- 新章节位于「一键安装」和「快速开始」之间，用户可快速定位
+- 保留原有「方案详解」章节（向后兼容已有锚点链接）
+- 新章节中交叉引用已有方案详解，避免内容重复
+
+**文档规模：**
+- README.md 从 2769 行增长到 3877 行（+1108 行）
+- 新增内容约 1100 行，覆盖全平台全方式
+
+### v0.5.4 (2026-02-07) - Windows.cmd 修复
+
+**修复内容：** Windows.cmd 中文乱码 + 浏览器测试改为有头模式
 
 ### v0.5.3 (2026-02-06) - 缓存智能管理增强
 
@@ -834,6 +886,1105 @@ flowchart TD
     F1 -->|是| F2
     F1 -->|否| F3
 ```
+
+
+## 全平台详细安装指南
+
+> 本章节汇总了所有平台的所有安装方式，帮助你快速找到最适合自己的方案。如果你已经熟悉某个方案，也可以直接跳转到对应的 [方案详解](#方案详解) 章节。
+
+### 安装方式总览
+
+| 平台 | 一键脚本 | Python 脚本 | 二进制安装 | 源码手动 | Docker | 推荐方式 |
+|------|---------|------------|-----------|---------|--------|---------|
+| **Windows** | ✅ Windows.cmd | ✅ install.py | ✅ exe | ✅ | ❌ | Windows.cmd |
+| **macOS** | ✅ linuxANDmacos.sh | ✅ install.py | ✅ | ✅ | ❌ | linuxANDmacos.sh |
+| **Linux (x64)** | ✅ linuxANDmacos.sh | ✅ install.py | ✅ | ✅ | ✅ | 桌面用 sh / VPS 用二进制 |
+| **Docker (x86)** | ❌ | ❌ | ❌ | ❌ | ✅ | docker-compose |
+| **青龙面板** | ❌ | ❌ | ❌ | ✅ 上传脚本 | ❌ | 青龙专用入口 |
+| **ARM 设备** | ✅ setup_arm.sh | ✅ install.py | ✅ | ✅ | ✅ ARM 版 | setup_arm.sh |
+| **LXC 容器** | ❌ | ❌ | ✅ | ✅ | ❌ | 二进制安装 |
+
+**选择建议：**
+- 🖥️ **个人电脑**（Windows/macOS）→ 一键脚本，最简单
+- 🖥️ **Linux 桌面** → linuxANDmacos.sh 一键脚本
+- ☁️ **VPS / 云服务器** → 二进制安装（无需 Python）
+- 📦 **LXC 容器** → 二进制安装（最轻量）
+- 🐳 **Docker 环境** → docker-compose 部署
+- 🔧 **青龙面板** → 上传脚本 + 青龙入口
+- 🍓 **树莓派 / ARM** → setup_arm.sh 安装脚本
+
+---
+
+### 1. Windows 系统
+
+#### 1.1 Windows.cmd 一键安装（推荐）
+
+**适用场景：** Windows 个人电脑，无需预装 Python，双击即可运行
+
+**前置条件：**
+- Windows 10/11
+- 已安装 Chrome 浏览器
+
+**操作步骤：**
+
+```cmd
+:: 方法1：直接双击运行
+双击 一键安装脚本点这里\Windows.cmd
+
+:: 方法2：命令行运行
+cd 项目目录\一键安装脚本点这里
+Windows.cmd
+```
+
+脚本会自动：下载 Python → 创建虚拟环境 → 安装依赖 → 交互式配置 → 引导首次登录
+
+**首次登录：**
+```cmd
+python main.py --first-login
+```
+浏览器自动打开 linux.do → 手动登录 → 回到命令行按 Enter
+
+**定时任务：**
+```cmd
+:: 运行定时任务设置脚本
+scripts\setup_task.bat
+:: 选择 1. 创建定时任务 → 输入执行次数和时间
+```
+
+> 详细说明参考 [方案A：Windows 任务计划](#方案awindows-任务计划)
+
+#### 1.2 install.py Python 脚本安装
+
+**适用场景：** 已安装 Python，希望使用功能最完整的安装脚本
+
+**前置条件：**
+- Windows 10/11
+- Python 3.8+
+- 已安装 Chrome 浏览器
+
+**操作步骤：**
+
+```cmd
+:: 方法1：双击运行
+双击 一键安装脚本点这里\install.py
+
+:: 方法2：命令行运行
+cd 项目目录\一键安装脚本点这里
+python install.py
+
+:: 方法3：在项目根目录运行
+cd 项目目录
+python 一键安装脚本点这里\install.py
+```
+
+脚本提供交互式菜单，包括：安装依赖、配置、首次登录、设置定时任务等。
+
+**首次登录：** 在菜单中选择 `6. 首次登录`，或手动运行：
+```cmd
+python main.py --first-login
+```
+
+**定时任务：** 在菜单中选择 `5. 设置定时任务`，按提示输入执行次数和时间。
+
+#### 1.3 二进制安装（无需 Python）
+
+**适用场景：** 不想安装 Python，希望单文件运行
+
+**前置条件：**
+- Windows 10/11
+- 已安装 Chrome 浏览器
+
+**操作步骤：**
+
+1. 前往 [GitHub Releases](https://github.com/xtgm/linux-do-max/releases) 下载 `linuxdo-checkin-windows-x64.exe`
+2. 首次登录：
+```cmd
+linuxdo-checkin-windows-x64.exe --first-login
+```
+3. 运行签到：
+```cmd
+linuxdo-checkin-windows-x64.exe
+```
+4. 设置定时任务：打开「任务计划程序」手动创建，或使用 `scripts\setup_task.bat`
+
+#### 1.4 源码手动安装
+
+**适用场景：** 开发者或需要自定义修改代码
+
+**前置条件：**
+- Python 3.8+
+- Git
+- Chrome 浏览器
+
+**操作步骤：**
+
+```cmd
+:: 1. 克隆项目
+git clone https://github.com/xtgm/linux-do-max.git
+cd linux-do-max
+
+:: 2. 创建虚拟环境
+python -m venv venv
+venv\Scripts\activate
+
+:: 3. 安装依赖
+pip install -r requirements.txt
+
+:: 4. 首次登录
+python main.py --first-login
+
+:: 5. 运行签到
+python main.py
+```
+
+**定时任务：**
+```cmd
+:: 运行定时任务设置脚本
+scripts\setup_task.bat
+```
+
+**Windows 常见问题：**
+
+| 问题 | 解决方法 |
+|------|---------|
+| 中文乱码 | 使用 Windows.cmd 脚本，或终端执行 `chcp 65001` |
+| `python` 命令找不到 | 安装 Python 时勾选「Add to PATH」 |
+| Chrome 路径错误 | 在 config.yaml 中指定 `browser_path` |
+| 定时任务不执行 | 确保电脑开机且未锁屏（有头模式需要桌面环境） |
+
+---
+
+### 2. macOS 系统
+
+#### 2.1 linuxANDmacos.sh 一键安装（推荐）
+
+**适用场景：** macOS 个人电脑，一键完成所有配置
+
+**前置条件：**
+- macOS 10.15+
+- 已安装 Chrome 浏览器
+
+**操作步骤：**
+
+```bash
+# 进入项目目录
+cd ~/linux-do-max
+
+# 赋予执行权限
+chmod +x 一键安装脚本点这里/linuxANDmacos.sh
+
+# 运行脚本
+./一键安装脚本点这里/linuxANDmacos.sh
+```
+
+脚本会自动：检测系统 → 安装 Python（通过 Homebrew）→ 创建虚拟环境 → 安装依赖 → 交互式配置
+
+**首次登录：**
+```bash
+python3 main.py --first-login
+```
+
+**定时任务：**
+```bash
+chmod +x scripts/setup_task.sh
+./scripts/setup_task.sh
+# 选择 1. 创建定时任务
+```
+
+> 详细说明参考 [方案B：macOS launchd](#方案bmacos-launchd)
+
+#### 2.2 install.py Python 脚本安装
+
+**适用场景：** 希望使用功能最完整的安装脚本
+
+**前置条件：**
+- macOS 10.15+
+- Python 3.8+（没有可通过 Homebrew 安装：`brew install python3`）
+
+**操作步骤：**
+
+```bash
+# 检查 Python 版本
+python3 --version
+
+# 运行安装脚本
+cd ~/linux-do-max/一键安装脚本点这里
+python3 install.py
+```
+
+脚本提供交互式菜单，包括：安装依赖、配置、首次登录、设置定时任务等。
+
+**首次登录：** 在菜单中选择 `6. 首次登录`，或手动运行：
+```bash
+python3 main.py --first-login
+```
+
+**定时任务：** 在菜单中选择 `5. 设置定时任务`，按提示输入执行次数和时间。
+
+#### 2.3 二进制安装（无需 Python）
+
+**适用场景：** 不想安装 Python 环境
+
+**前置条件：**
+- macOS 10.15+
+- 已安装 Chrome 浏览器
+
+**操作步骤：**
+
+```bash
+# Intel Mac
+curl -L -o linuxdo-checkin https://github.com/xtgm/linux-do-max/releases/download/v0.3.2/linuxdo-checkin-macos-x64
+
+# Apple Silicon Mac (M1/M2/M3)
+curl -L -o linuxdo-checkin https://github.com/xtgm/linux-do-max/releases/download/v0.3.2/linuxdo-checkin-macos-arm64
+
+# 赋予执行权限
+chmod +x linuxdo-checkin
+
+# 首次登录
+./linuxdo-checkin --first-login
+
+# 运行签到
+./linuxdo-checkin
+```
+
+**定时任务（launchd）：**
+
+可以使用 `scripts/setup_task.sh` 自动创建，或手动创建 plist 文件：
+
+```bash
+# 自动创建
+./scripts/setup_task.sh
+
+# 手动查看任务
+launchctl list | grep linuxdo
+```
+
+#### 2.4 源码手动安装
+
+**适用场景：** 开发者或需要自定义修改代码
+
+**前置条件：**
+- macOS 10.15+
+- Python 3.8+（`brew install python3`）
+- Git
+- Chrome 浏览器
+
+**操作步骤：**
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/xtgm/linux-do-max.git
+cd linux-do-max
+
+# 2. 创建虚拟环境
+python3 -m venv venv
+source venv/bin/activate
+
+# 3. 安装依赖
+pip install -r requirements.txt
+
+# 4. 首次登录
+python3 main.py --first-login
+
+# 5. 运行签到
+python3 main.py
+```
+
+**定时任务：**
+```bash
+chmod +x scripts/setup_task.sh
+./scripts/setup_task.sh
+```
+
+**macOS 常见问题：**
+
+| 问题 | 解决方法 |
+|------|---------|
+| `python3` 命令找不到 | `brew install python3` |
+| 定时任务不执行 | 检查电脑是否休眠，运行 `launchctl list \| grep linuxdo` |
+| 二进制文件无法运行 | 系统偏好设置 → 安全性 → 允许运行 |
+| 权限不足 | `chmod +x` 赋予执行权限 |
+
+---
+
+### 3. Linux 系统（Ubuntu/Debian/CentOS/Fedora/Arch）
+
+#### 3.1 linuxANDmacos.sh 一键安装（推荐桌面环境）
+
+**适用场景：** 有图形界面的 Linux 桌面系统
+
+**前置条件：**
+- Linux 系统（Debian/Ubuntu/CentOS/Fedora/Arch/Alpine）
+- 有图形界面（用于首次登录）
+
+**操作步骤：**
+
+```bash
+# 进入项目目录
+cd ~/linux-do-max
+
+# 赋予执行权限
+chmod +x 一键安装脚本点这里/linuxANDmacos.sh
+
+# 运行脚本
+./一键安装脚本点这里/linuxANDmacos.sh
+```
+
+脚本会自动：检测发行版和包管理器 → 安装 Chrome/Chromium → 安装 Xvfb 和中文字体 → 创建 Python 虚拟环境 → 安装依赖 → 交互式配置
+
+**首次登录：**
+```bash
+python3 main.py --first-login
+```
+
+**定时任务：**
+```bash
+chmod +x scripts/setup_task_linux.sh
+./scripts/setup_task_linux.sh
+# 选择 1. 创建定时任务 → 输入执行次数和时间
+```
+
+> **虚拟机用户注意：** 如果无法访问 GitHub，需要先配置代理。参考 [问题 2.1：Linux 虚拟机无法访问 GitHub](#问题-21linux-虚拟机无法访问-github)
+
+#### 3.2 install.py Python 脚本安装
+
+**适用场景：** 需要更完整的安装选项和交互式菜单
+
+**前置条件：**
+- Python 3.8+
+
+**安装 Python（如果没有）：**
+
+```bash
+# Ubuntu/Debian
+sudo apt update && sudo apt install -y python3
+
+# CentOS/RHEL
+sudo yum install -y python3
+
+# Fedora
+sudo dnf install -y python3
+
+# Arch
+sudo pacman -S python
+
+# Alpine
+sudo apk add python3
+```
+
+**运行安装脚本：**
+
+```bash
+cd ~/linux-do-max/一键安装脚本点这里
+python3 install.py
+```
+
+脚本提供交互式菜单，包括：安装依赖、配置、首次登录、设置定时任务等。
+
+**首次登录：** 在菜单中选择 `6. 首次登录`，或手动运行：
+```bash
+python3 main.py --first-login
+```
+
+**定时任务：** 在菜单中选择 `5. 设置定时任务`，按提示输入执行次数和时间。
+
+> **注意**：Linux 系统使用 `python3` 命令，不是 `python`
+
+#### 3.3 二进制安装（无需 Python，推荐 VPS/LXC）
+
+**适用场景：** VPS、云服务器、LXC 容器，无需安装 Python 环境
+
+**前置条件：**
+- Linux x86_64 系统
+- Chromium 浏览器
+- Xvfb（虚拟显示）
+
+**完整操作步骤：**
+
+```bash
+# 1. 安装系统依赖
+# Debian/Ubuntu
+apt update && apt install -y wget unzip chromium xvfb fonts-wqy-zenhei fonts-wqy-microhei
+
+# CentOS/RHEL
+yum install -y wget unzip chromium xorg-x11-server-Xvfb wqy-zenhei-fonts
+
+# Alpine
+apk add wget unzip chromium xvfb ttf-wqy-zenhei
+
+# 2. 下载二进制文件
+cd /root
+wget https://github.com/xtgm/linux-do-max/releases/download/v0.3.2/linuxdo-checkin-linux-x64
+chmod +x linuxdo-checkin-linux-x64
+
+# 3. 创建配置文件
+cat > /root/config.yaml << 'EOF'
+chrome_args:
+  - "--no-sandbox"
+  - "--disable-dev-shm-usage"
+headless: false
+browser_path: "/usr/bin/chromium"
+browse_count: 10
+like_probability: 0.3
+tg_bot_token: ""
+tg_chat_id: ""
+EOF
+
+# 4. 首次登录（在有图形界面的电脑上完成，然后上传登录数据）
+# 参考下方"服务器首次登录方法"
+
+# 5. 测试运行
+xvfb-run -a ./linuxdo-checkin-linux-x64
+
+# 6. 设置定时任务
+(crontab -l 2>/dev/null; echo "0 8 * * * cd /root && xvfb-run -a ./linuxdo-checkin-linux-x64 >> /root/checkin.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 20 * * * cd /root && xvfb-run -a ./linuxdo-checkin-linux-x64 >> /root/checkin.log 2>&1") | crontab -
+```
+
+**服务器首次登录方法：**
+
+由于服务器没有图形界面，需要在有图形界面的电脑上完成首次登录，然后将登录数据上传：
+
+```bash
+# === 在有图形界面的电脑上 ===
+git clone https://github.com/xtgm/linux-do-max.git
+cd linux-do-max
+pip install -r requirements.txt
+python main.py --first-login
+# 完成登录后打包
+tar -czvf linuxdo-browser.tar.gz -C ~ .linuxdo-browser
+
+# === 上传到服务器 ===
+scp linuxdo-browser.tar.gz root@你的服务器IP:~/
+
+# === 在服务器上解压 ===
+cd /root
+tar -xzvf linuxdo-browser.tar.gz
+ls -la ~/.linuxdo-browser/
+```
+
+> 详细说明参考 [方案G：二进制安装](#方案g二进制安装)
+
+#### 3.4 源码手动安装
+
+**适用场景：** 开发者或需要自定义修改代码
+
+**前置条件：**
+- Python 3.8+
+- Git
+- Chrome/Chromium 浏览器
+- Xvfb（无头服务器需要）
+
+**操作步骤：**
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/xtgm/linux-do-max.git
+cd linux-do-max
+
+# 2. 安装系统依赖
+# Debian/Ubuntu
+sudo apt update && sudo apt install -y chromium-browser xvfb fonts-wqy-zenhei fonts-wqy-microhei
+
+# CentOS/RHEL
+sudo yum install -y chromium xorg-x11-server-Xvfb wqy-zenhei-fonts
+
+# Arch
+sudo pacman -S chromium xorg-server-xvfb wqy-zenhei
+
+# 3. 创建虚拟环境
+python3 -m venv venv
+source venv/bin/activate
+
+# 4. 安装 Python 依赖
+pip install -r requirements.txt
+
+# 5. 首次登录（需要图形界面）
+python3 main.py --first-login
+
+# 6. 运行签到
+python3 main.py
+
+# 7. 设置定时任务
+chmod +x scripts/setup_task_linux.sh
+./scripts/setup_task_linux.sh
+```
+
+> 详细说明参考 [方案C：Linux cron](#方案clinux-cron)
+
+#### 3.5 Docker 部署
+
+**适用场景：** 希望隔离环境、方便迁移
+
+**前置条件：**
+- 已安装 Docker 和 Docker Compose
+- 有图形界面支持（首次登录需要，或使用方案四在其他电脑完成）
+
+```bash
+# 1. 构建镜像
+docker-compose build
+
+# 2. 首次登录（需要 X11 转发）
+xhost +local:docker
+docker-compose run --rm -e DISPLAY=$DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix linuxdo-checkin python main.py --first-login
+
+# 3. 运行签到
+docker-compose run --rm linuxdo-checkin python main.py
+
+# 4. 后台运行（配合定时任务）
+docker-compose up -d
+```
+
+**定时任务：** 使用宿主机 cron 或 ofelia，详见 [4.3 定时任务配置](#43-定时任务配置)
+
+> 详细说明参考 [方案D：Docker 部署](#方案ddocker-部署)
+
+**Linux 常见问题：**
+
+| 问题 | 解决方法 |
+|------|---------|
+| 浏览器启动失败 | config.yaml 添加 `chrome_args: ["--no-sandbox"]` |
+| `python` 命令找不到 | 使用 `python3` |
+| Xvfb 未安装 | `apt install xvfb` 或 `yum install xorg-x11-server-Xvfb` |
+| 虚拟机无法访问 GitHub | 配置代理，参考 [问题 2.1](#问题-21linux-虚拟机无法访问-github) |
+| Snap Chromium 不兼容 | 使用 Google Chrome 官方 apt 源安装 |
+
+---
+
+### 4. Docker 部署（x86_64）
+
+#### 4.1 docker-compose 部署（推荐）
+
+**适用场景：** 服务器部署，隔离环境，方便管理
+
+**前置条件：**
+- 已安装 Docker 和 Docker Compose
+- 有图形界面支持（首次登录需要，或使用方案四在其他电脑完成）
+
+**操作步骤：**
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/xtgm/linux-do-max.git
+cd linux-do-max
+
+# 2. 配置环境变量（编辑 docker-compose.yml）
+# 修改 environment 部分：
+#   TG_BOT_TOKEN=你的Token
+#   TG_CHAT_ID=你的ChatID
+
+# 3. 构建镜像
+docker-compose build
+
+# 4. 首次登录
+# 方式1：X11 转发（Linux 桌面）
+xhost +local:docker
+docker-compose run --rm \
+    -e DISPLAY=$DISPLAY \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    linuxdo-checkin python main.py --first-login
+
+# 方式2：在其他电脑完成首次登录后上传数据
+# 将 ~/.linuxdo-browser 目录复制到 ./data/browser/
+
+# 5. 运行签到
+docker-compose run --rm linuxdo-checkin python main.py
+```
+
+#### 4.2 手动 docker build
+
+**适用场景：** 不使用 docker-compose，直接用 docker 命令管理
+
+**首次登录：** 使用方案四在有图形界面的电脑上完成登录，将 `~/.linuxdo-browser` 目录复制到 `./data/browser/`
+
+```bash
+# 构建镜像
+docker build -t linuxdo-checkin .
+
+# 运行
+docker run --rm \
+    -v $(pwd)/data/browser:/root/.linuxdo-browser \
+    -v $(pwd)/logs:/app/logs \
+    -e TG_BOT_TOKEN=你的Token \
+    -e TG_CHAT_ID=你的ChatID \
+    linuxdo-checkin python main.py
+```
+
+**定时任务：** 使用宿主机 cron：
+```bash
+crontab -e
+# 添加：
+0 8 * * * docker run --rm -v /path/to/data/browser:/root/.linuxdo-browser linuxdo-checkin python main.py
+```
+
+#### 4.3 定时任务配置
+
+**方式1：使用 ofelia（Docker 原生定时任务）**
+
+在 `docker-compose.yml` 中取消 ofelia 服务的注释：
+
+```yaml
+ofelia:
+  image: mcuadros/ofelia:latest
+  depends_on:
+    - linuxdo-checkin
+  command: daemon --docker
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock:ro
+  labels:
+    ofelia.job-run.checkin-am.schedule: "0 0 8 * * *"
+    ofelia.job-run.checkin-am.container: "linuxdo-checkin"
+    ofelia.job-run.checkin-pm.schedule: "0 0 20 * * *"
+    ofelia.job-run.checkin-pm.container: "linuxdo-checkin"
+```
+
+**方式2：使用宿主机 cron**
+
+```bash
+crontab -e
+# 添加：
+0 8 * * * docker-compose -f /path/to/docker-compose.yml run --rm linuxdo-checkin python main.py
+0 20 * * * docker-compose -f /path/to/docker-compose.yml run --rm linuxdo-checkin python main.py
+```
+
+**数据持久化：**
+
+| 目录 | 说明 |
+|------|------|
+| `./data/browser` | 浏览器用户数据（登录状态） |
+| `./logs` | 运行日志 |
+
+**Docker 常见问题：**
+
+| 问题 | 解决方法 |
+|------|---------|
+| 首次登录困难 | 使用方案四：在其他电脑完成登录后上传数据 |
+| 容器时区不对 | 添加 `-e TZ=Asia/Shanghai` |
+| 浏览器启动失败 | 确保 config.yaml 包含 `--no-sandbox` |
+
+---
+
+### 5. 青龙面板
+
+#### 5.1 Alpine 基础镜像（官方默认）
+
+**适用场景：** 使用青龙面板官方 Docker 镜像（基于 Alpine Linux）
+
+**操作步骤：**
+
+```bash
+# 1. SSH 登录青龙面板所在服务器
+
+# 2. 进入青龙容器安装系统依赖
+docker exec -it qinglong sh
+apk add xvfb chromium fonts-wqy-zenhei
+exit
+
+# 3. 上传项目文件到青龙脚本目录
+# 将以下文件上传到 /ql/scripts/linuxdo-checkin/
+#   core/  main.py  ql_main.py  config.yaml  requirements.txt
+
+# 4. 在青龙面板「依赖管理」→「Python」中添加：
+#   DrissionPage
+#   PyYAML
+#   requests
+
+# 5. 在青龙面板「环境变量」中添加：
+#   TG_BOT_TOKEN = 你的Token
+#   TG_CHAT_ID = 你的ChatID
+#   USER_DATA_DIR = /ql/data/linuxdo-browser
+#   HEADLESS = false
+
+# 6. 首次登录（需要 VNC 或 X11 转发）
+docker exec -it qinglong sh
+cd /ql/scripts/linuxdo-checkin
+python3 main.py --first-login
+
+# 7. 在青龙面板「定时任务」中添加：
+#   名称: LinuxDO签到
+#   命令: xvfb-run -a python3 /ql/scripts/linuxdo-checkin/ql_main.py
+#   定时规则: 0 8,20 * * *
+```
+
+#### 5.2 Debian 基础镜像
+
+**适用场景：** 使用 Debian 基础的青龙面板镜像
+
+与 Alpine 的区别主要在系统依赖安装命令：
+
+```bash
+# 进入容器
+docker exec -it qinglong bash
+
+# 安装依赖（Debian 命令）
+apt-get update && apt-get install -y xvfb chromium fonts-wqy-zenhei fonts-wqy-microhei
+```
+
+其余步骤（上传文件、安装 Python 依赖、配置环境变量、首次登录、添加定时任务）与 [5.1 Alpine 基础镜像](#51-alpine-基础镜像官方默认) 完全相同。
+
+#### 5.3 定时任务和环境变量配置
+
+**环境变量（在青龙面板中配置）：**
+
+| 变量名 | 值 | 说明 |
+|--------|-----|------|
+| TG_BOT_TOKEN | 你的Token | Telegram Bot Token |
+| TG_CHAT_ID | 你的ChatID | Telegram Chat ID |
+| USER_DATA_DIR | /ql/data/linuxdo-browser | 用户数据目录 |
+| HEADLESS | false | 有头模式（CF 验证需要） |
+| BROWSER_PATH | /usr/bin/chromium-browser | 浏览器路径（按实际情况填写） |
+
+**定时任务格式：**
+
+| 字段 | 值 |
+|------|-----|
+| 名称 | LinuxDO签到 |
+| 命令 | `xvfb-run -a python3 /ql/scripts/linuxdo-checkin/ql_main.py` |
+| 定时规则 | `0 8,20 * * *`（每天 8:00 和 20:00） |
+
+**青龙面板常见问题：**
+
+| 问题 | 解决方法 |
+|------|---------|
+| DrissionPage 安装失败 | `pip3 install DrissionPage -i https://pypi.tuna.tsinghua.edu.cn/simple` |
+| Xvfb 未安装 | Alpine: `apk add xvfb` / Debian: `apt install xvfb` |
+| 首次登录困难 | 使用方案四在其他电脑完成登录后上传数据 |
+| 命令格式错误 | 确保使用 `xvfb-run -a python3 /path/to/ql_main.py` |
+
+> 详细说明参考 [方案E：青龙面板](#方案e青龙面板)
+
+---
+
+### 6. ARM 设备（树莓派/Orange Pi/电视盒子）
+
+#### 6.1 setup_arm.sh 一键安装（推荐）
+
+**适用场景：** 树莓派、Orange Pi 等有图形界面的 ARM 设备
+
+**前置条件：**
+- ARM64 架构（推荐）
+- 至少 1GB 内存（推荐 2GB+）
+
+**操作步骤：**
+
+```bash
+# 1. 克隆项目
+git clone https://github.com/xtgm/linux-do-max.git
+cd linux-do-max
+
+# 2. 赋予执行权限
+chmod +x scripts/setup_arm.sh
+
+# 3. 运行安装脚本
+./scripts/setup_arm.sh
+# 选择 1. 完整安装
+
+# 4. 首次登录
+./scripts/setup_arm.sh
+# 选择 7. 首次登录
+
+# 5. 设置定时任务
+./scripts/setup_arm.sh
+# 选择 6. 设置定时任务
+```
+
+脚本会自动检测系统架构和操作系统，安装 Chromium、Xvfb、中文字体等依赖。
+
+> 详细说明参考 [方案F：ARM 设备部署](#方案farm-设备部署)
+
+#### 6.2 linuxANDmacos.sh 安装
+
+**适用场景：** ARM 设备上的 Debian/Ubuntu 系统，有图形界面
+
+**前置条件：**
+- ARM64 架构
+- 有图形界面（用于首次登录）
+
+```bash
+cd ~/linux-do-max
+chmod +x 一键安装脚本点这里/linuxANDmacos.sh
+./一键安装脚本点这里/linuxANDmacos.sh
+```
+
+脚本会自动检测 ARM 架构并安装对应依赖。首次登录和定时任务在脚本交互菜单中完成。
+
+#### 6.3 install.py Python 脚本安装
+
+**适用场景：** 需要更完整的安装选项和交互式菜单
+
+**前置条件：**
+- Python 3.8+
+
+```bash
+# 安装 Python（如果没有）
+sudo apt update && sudo apt install -y python3
+
+# 运行安装脚本
+cd ~/linux-do-max/一键安装脚本点这里
+python3 install.py
+```
+
+脚本提供交互式菜单，包括：安装依赖、配置、首次登录、设置定时任务等。
+
+#### 6.4 二进制安装（无需 Python）
+
+**适用场景：** ARM 服务器、电视盒子等无 Python 环境的设备
+
+```bash
+# 1. 安装依赖
+apt update && apt install -y wget unzip chromium xvfb fonts-wqy-zenhei fonts-wqy-microhei
+
+# 2. 下载 ARM64 版本
+cd /root
+wget https://github.com/xtgm/linux-do-max/releases/download/v0.3.2/linuxdo-checkin-linux-arm64
+chmod +x linuxdo-checkin-linux-arm64
+
+# 3. 创建配置文件
+cat > /root/config.yaml << 'EOF'
+chrome_args:
+  - "--no-sandbox"
+  - "--disable-dev-shm-usage"
+headless: false
+browser_path: "/usr/bin/chromium-browser"
+browse_count: 10
+like_probability: 0.3
+tg_bot_token: ""
+tg_chat_id: ""
+EOF
+
+# 4. 上传登录数据（在其他电脑完成首次登录后）
+# 参考"无图形界面首次登录"部分
+
+# 5. 测试运行
+xvfb-run -a ./linuxdo-checkin-linux-arm64
+
+# 6. 设置定时任务
+(crontab -l 2>/dev/null; echo "0 8 * * * cd /root && xvfb-run -a ./linuxdo-checkin-linux-arm64 >> /root/checkin.log 2>&1") | crontab -
+```
+
+#### 6.5 Docker 部署（ARM 版）
+
+**适用场景：** ARM 设备上使用 Docker 隔离环境
+
+**前置条件：**
+- 已安装 Docker 和 Docker Compose
+- ARM64 架构
+
+```bash
+# 1. 使用 ARM 专用 Dockerfile 构建
+docker-compose -f docker-compose.arm.yml build
+
+# 2. 首次登录（需要 X11 转发或 VNC）
+xhost +local:docker
+docker-compose -f docker-compose.arm.yml run --rm \
+    -e DISPLAY=$DISPLAY \
+    -v /tmp/.X11-unix:/tmp/.X11-unix \
+    linuxdo-checkin python main.py --first-login
+
+# 3. 启动服务
+docker-compose -f docker-compose.arm.yml up -d
+```
+
+**定时任务：** 使用宿主机 cron：
+```bash
+crontab -e
+# 添加：
+0 8 * * * docker-compose -f /path/to/docker-compose.arm.yml run --rm linuxdo-checkin python main.py
+0 20 * * * docker-compose -f /path/to/docker-compose.arm.yml run --rm linuxdo-checkin python main.py
+```
+
+**ARM Docker 内存限制：**
+
+`docker-compose.arm.yml` 已配置内存限制（最大 1GB，保留 512MB）。如需调整：
+
+```yaml
+deploy:
+  resources:
+    limits:
+      memory: 2G
+    reservations:
+      memory: 1G
+```
+
+#### 6.6 无图形界面首次登录（4种方案）
+
+ARM 设备（电视盒子、无桌面服务器）通常没有图形界面，首次登录需要特殊处理：
+
+| 方案 | 适用场景 | 难度 |
+|------|---------|------|
+| 方案一：VNC 远程桌面 | 有网络连接的 ARM 设备 | 中 |
+| 方案二：SSH X11 转发 | 本地有 X Server | 较高 |
+| 方案三：连接显示器 | 有 HDMI 接口 | 低 |
+| **方案四：其他电脑登录** | **电视盒子/纯 SSH 环境（推荐）** | **低** |
+
+**方案四（推荐）简要流程：**
+
+```bash
+# 在有图形界面的电脑上完成首次登录
+python main.py --first-login
+
+# 打包登录数据
+tar -czvf linuxdo-browser.tar.gz -C ~ .linuxdo-browser
+
+# 上传到 ARM 设备
+scp linuxdo-browser.tar.gz root@ARM设备IP:~/
+
+# 在 ARM 设备上解压
+tar -xzvf linuxdo-browser.tar.gz -C ~/
+
+# 设置无头模式并运行
+# config.yaml 中设置 headless: true
+xvfb-run -a python3 main.py
+```
+
+> 4种方案的完整说明参考 [方案F 无图形界面解决方案](#无图形界面解决方案重要)
+
+**ARM 设备常见问题：**
+
+| 问题 | 解决方法 |
+|------|---------|
+| 内存不足 | 增加 swap：编辑 `/etc/dphys-swapfile` 设置 `CONF_SWAPSIZE=2048` |
+| Chromium 崩溃 | 减少 `browse_count`，增加 swap |
+| 找不到 Chromium | `which chromium-browser` 或 `which chromium`，更新 config.yaml |
+| VNC 中文方块 | `sudo apt install fonts-wqy-zenhei && fc-cache -fv` |
+| Docker 构建失败 | 使用 `docker-compose -f docker-compose.arm.yml build` |
+
+**树莓派内存优化：**
+
+```bash
+# 增加 swap
+sudo dphys-swapfile swapoff
+sudo nano /etc/dphys-swapfile
+# 设置 CONF_SWAPSIZE=2048
+sudo dphys-swapfile setup
+sudo dphys-swapfile swapon
+```
+
+---
+
+### 7. LXC 容器
+
+#### 7.1 二进制安装（推荐，最简单）
+
+**适用场景：** Proxmox VE 等平台的 LXC 容器，无需安装 Python
+
+**前置条件：**
+- LXC 容器（Debian/Ubuntu/Alpine）
+- root 权限
+
+**完整操作步骤：**
+
+```bash
+# 1. 安装系统依赖
+# Debian/Ubuntu LXC
+apt update && apt install -y wget unzip chromium xvfb fonts-wqy-zenhei fonts-wqy-microhei
+
+# Alpine LXC
+apk add wget unzip chromium xvfb ttf-wqy-zenhei
+
+# 2. 下载二进制文件
+cd /root
+wget https://github.com/xtgm/linux-do-max/releases/download/v0.3.2/linuxdo-checkin-linux-x64
+chmod +x linuxdo-checkin-linux-x64
+
+# 3. 创建配置文件（LXC 必须添加 --no-sandbox）
+cat > /root/config.yaml << 'EOF'
+chrome_args:
+  - "--no-sandbox"
+  - "--disable-dev-shm-usage"
+headless: false
+browser_path: "/usr/bin/chromium"
+browse_count: 10
+like_probability: 0.3
+tg_bot_token: ""
+tg_chat_id: ""
+EOF
+
+# 4. 在有图形界面的电脑上完成首次登录，打包上传登录数据
+# （参考上方"服务器首次登录方法"）
+
+# 5. 解压登录数据
+unzip linuxdo-browser.zip
+# 或
+tar -xzvf linuxdo-browser.tar.gz
+
+# 6. 测试运行
+xvfb-run -a ./linuxdo-checkin-linux-x64
+
+# 7. 设置定时任务
+(crontab -l 2>/dev/null; echo "0 8 * * * cd /root && xvfb-run -a ./linuxdo-checkin-linux-x64 >> /root/checkin.log 2>&1") | crontab -
+(crontab -l 2>/dev/null; echo "0 20 * * * cd /root && xvfb-run -a ./linuxdo-checkin-linux-x64 >> /root/checkin.log 2>&1") | crontab -
+```
+
+#### 7.2 源码安装
+
+**适用场景：** 需要自定义修改代码
+
+**前置条件：**
+- LXC 容器（Debian/Ubuntu）
+- root 权限
+
+**首次登录：** LXC 容器没有图形界面，需要在有图形界面的电脑上完成首次登录，然后将 `~/.linuxdo-browser` 目录打包上传到容器中。
+
+```bash
+# 1. 安装系统依赖和 Python
+apt update && apt install -y python3 python3-pip python3-venv \
+    chromium xvfb fonts-wqy-zenhei fonts-wqy-microhei git
+
+# 2. 克隆项目
+cd /root
+git clone https://github.com/xtgm/linux-do-max.git
+cd linux-do-max
+
+# 3. 创建虚拟环境
+python3 -m venv venv
+source venv/bin/activate
+
+# 4. 安装依赖
+pip install -r requirements.txt
+
+# 5. 创建配置文件
+cat > config.yaml << 'EOF'
+chrome_args:
+  - "--no-sandbox"
+  - "--disable-dev-shm-usage"
+headless: false
+browser_path: "/usr/bin/chromium"
+browse_count: 10
+like_probability: 0.3
+tg_bot_token: ""
+tg_chat_id: ""
+EOF
+
+# 6. 上传登录数据后测试
+xvfb-run -a ./venv/bin/python main.py
+
+# 7. 设置定时任务
+(crontab -l 2>/dev/null; echo "0 8 * * * cd /root/linux-do-max && xvfb-run -a ./venv/bin/python main.py >> /root/checkin.log 2>&1") | crontab -
+```
+
+#### 7.3 注意事项
+
+1. **必须添加 `--no-sandbox`** — LXC 容器没有完整的 Linux 内核命名空间，Chrome 的沙箱功能无法正常工作
+2. **`--disable-dev-shm-usage`** — LXC 容器的 `/dev/shm` 通常较小，此参数避免共享内存不足导致崩溃
+3. **Xvfb 必须安装** — LXC 容器没有图形界面，需要虚拟显示
+4. **首次登录** — 必须在有图形界面的电脑上完成，然后上传登录数据
+5. **检查 `/dev/shm` 大小** — 如果 Chromium 仍然崩溃：
+```bash
+df -h /dev/shm
+# 如果太小，扩大：
+sudo mount -o remount,size=512M /dev/shm
+```
+
+**LXC 常见问题：**
+
+| 问题 | 解决方法 |
+|------|---------|
+| 浏览器启动失败 | 确保 config.yaml 包含 `--no-sandbox` |
+| Chromium 崩溃 | 检查 `/dev/shm` 大小，扩大到 512M |
+| cron 不执行 | 检查 cron 服务：`service cron status`，未启动则 `service cron start` |
+| 找不到 chromium | `which chromium`，更新 config.yaml 中的 `browser_path` |
 
 ---
 
