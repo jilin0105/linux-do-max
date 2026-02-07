@@ -77,22 +77,31 @@ if not defined CHROME_PATH (
     goto :skip_browser_test
 )
 
-REM 验证浏览器安装
-echo [信息] 验证浏览器安装...
 echo [成功] 检测到浏览器: %CHROME_PATH%
 
-REM 获取 Chrome 版本
-for /f "tokens=*" %%v in ('"%CHROME_PATH%" --version 2^>nul') do (
-    echo [信息] 浏览器版本: %%v
+set "CHROME_VER="
+for /f "tokens=3" %%v in ('reg query "HKLM\SOFTWARE\Google\Chrome\BLBeacon" /v version 2^>nul') do set "CHROME_VER=%%v"
+if not defined CHROME_VER (
+    for /f "tokens=3" %%v in ('reg query "HKCU\SOFTWARE\Google\Chrome\BLBeacon" /v version 2^>nul') do set "CHROME_VER=%%v"
+)
+if defined CHROME_VER (
+    echo [信息] Chrome %CHROME_VER%
+) else (
+    echo [信息] Chrome 已安装
 )
 
 echo.
 echo [信息] 测试浏览器启动...
-"%CHROME_PATH%" --headless=new --disable-gpu --no-sandbox --dump-dom "data:text/html,<h1>Test</h1>" >nul 2>&1
-if %errorlevel% equ 0 (
-    echo [成功] 浏览器启动测试通过！
+echo [信息] 即将打开浏览器窗口，请确认浏览器能正常显示...
+echo.
+start "" "%CHROME_PATH%" --no-sandbox --disable-gpu --no-first-run "https://www.google.com"
+echo.
+set "browser_ok="
+set /p browser_ok="浏览器是否正常显示？[Y/n]: "
+if /i "%browser_ok%"=="n" (
+    echo [警告] 浏览器启动测试未通过，但可能仍然可用
 ) else (
-    echo [警告] 浏览器启动测试未能确认，但可能仍然可用
+    echo [成功] 浏览器启动测试通过！
 )
 echo.
 
@@ -109,7 +118,7 @@ if not exist "main.py" (
 )
 
 REM ============================================================
-REM 启动时检查更新
+REM Check update on start
 REM ============================================================
 call :check_update
 if "%UPDATE_DONE%"=="1" goto :exit_script
@@ -145,10 +154,10 @@ goto :menu
 
 :check_update
 set "UPDATE_DONE=0"
-REM 检查 updater.py 是否存在
+REM Check if updater.py exists
 if not exist "updater.py" goto :eof
 
-REM 确定使用哪个 Python：优先 venv，否则系统 Python
+REM Determine Python: prefer venv, fallback to system
 set "PYTHON_CMD="
 if exist "venv\Scripts\python.exe" (
     set "PYTHON_CMD=venv\Scripts\python.exe"
@@ -168,7 +177,7 @@ if "%PYTHON_CMD%"=="" (
 echo [信息] 检查更新中...
 echo.
 
-REM 使用 Python 检查更新
+REM Run update check via Python
 %PYTHON_CMD% -c "from updater import check_update; from version import __version__; info = check_update(silent=True); print(f'CURRENT={__version__}'); print(f'LATEST={info[\"latest_version\"]}' if info else 'LATEST=NONE')" > "%TEMP%\update_check.txt" 2>nul
 
 if errorlevel 1 (
@@ -215,7 +224,7 @@ goto :eof
 
 :manual_update
 echo.
-REM 确定使用哪个 Python
+REM Determine Python
 set "PYTHON_CMD="
 if exist "venv\Scripts\python.exe" (
     set "PYTHON_CMD=venv\Scripts\python.exe"
