@@ -90,6 +90,18 @@ class Checkin:
             print(f"[签到] 首页加载完成，等待 {wait:.1f} 秒...")
             time.sleep(wait)
 
+            # 2.5. 检查首页是否触发 403（截图中的场景）
+            if self.browser.check_cf_403():
+                print("[签到] 首页触发 403，处理 CF 验证...")
+                if not self.browser.handle_cf_403(self.SITE_URL):
+                    print("[签到] CF 验证失败")
+                    return self._finish(False)
+                # 验证通过后重新访问首页
+                print("[签到] CF 验证通过，重新访问首页...")
+                if not self.browser.goto(self.SITE_URL, wait=3):
+                    return self._finish(False)
+                time.sleep(random.uniform(3, 5))
+
             # 3. 等待 CF 验证
             if not self.browser.wait_for_cf():
                 print("[签到] CF 验证失败")
@@ -249,6 +261,15 @@ class Checkin:
             print(f"[签到] Connect 页面加载中，等待 {wait:.1f} 秒...")
             time.sleep(wait)
 
+            # 检查 403
+            if self.browser.check_cf_403():
+                print("[签到] Connect 页面触发 403，处理 CF 验证...")
+                if not self.browser.handle_cf_403(self.CONNECT_URL):
+                    print("[签到] CF 验证失败，跳过获取用户信息")
+                    return
+                self.browser.goto(self.CONNECT_URL, wait=3)
+                time.sleep(random.uniform(2, 4))
+
             # 等待 CF 验证
             if not self.browser.wait_for_cf(timeout=60):
                 print("[签到] Connect 页面 CF 验证失败")
@@ -395,6 +416,16 @@ class Checkin:
             if not self.browser.goto(url, wait=3):
                 continue
 
+            # 检查 403
+            if self.browser.check_cf_403():
+                print(f"[签到] 获取 {name} 帖子时触发 403，处理 CF 验证...")
+                if not self.browser.handle_cf_403(url):
+                    print("[签到] CF 验证失败，跳过此页面")
+                    continue
+                # 验证通过后重新访问
+                if not self.browser.goto(url, wait=3):
+                    continue
+
             # 检查限流
             if self.browser.check_rate_limit():
                 self.set_rate_limited()
@@ -522,28 +553,8 @@ class Checkin:
             return 0
 
     def _wait_cf_verification(self, current_url: str) -> bool:
-        """等待 CF 验证完成（403 是 CF 5秒盾触发的前提）"""
-        try:
-            # 1. 先关闭 403 对话框
-            self.browser.close_403_dialog()
-
-            # 2. 跳转到 challenge 页面
-            challenge_url = f"https://linux.do/challenge?redirect={current_url}"
-            print(f"[签到] 跳转到验证页面...")
-            self.browser.goto(challenge_url, wait=3)
-
-            # 3. 等待 CF 验证完成（最多等待 5 分钟）
-            print("[签到] 等待 CF 验证，最多 5 分钟...")
-            if not self.browser.wait_for_cf(timeout=300):
-                print("[签到] CF 验证超时，等待用户手动处理...")
-                # 额外等待用户手动处理
-                time.sleep(60)
-                return self.browser.wait_for_cf(timeout=120)
-
-            return True
-        except Exception as e:
-            print(f"[签到] CF 验证异常: {e}")
-            return False
+        """等待 CF 验证完成（403 触发后调用）"""
+        return self.browser.handle_cf_403(current_url)
 
     def _like_post(self) -> bool:
         """点赞帖子"""

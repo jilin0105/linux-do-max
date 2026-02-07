@@ -401,7 +401,7 @@ class Browser:
     def wait_for_cf(self, timeout: int = 120) -> bool:
         """
         等待 Cloudflare 5秒盾验证通过
-        检测页面是否还在验证中
+        检测页面是否还在验证中，同时自动处理 403 对话框
         """
         if not self.page:
             return False
@@ -411,6 +411,9 @@ class Browser:
 
         while time.time() - start_time < timeout:
             try:
+                # 先检查是否有 403 对话框，自动关闭
+                self._auto_close_dialog()
+
                 page_text = self.page.html.lower()
             except:
                 time.sleep(2)
@@ -442,6 +445,21 @@ class Browser:
         print("[浏览器] CF 验证超时")
         return False
 
+    def _auto_close_dialog(self):
+        """自动检测并关闭任何弹出的对话框（403、错误提示等）"""
+        try:
+            # 快速检测是否有对话框
+            dialog = self.page.ele("css:.dialog-body, .bootbox-body, .modal-body", timeout=0.5)
+            if not dialog:
+                return
+            dialog_text = dialog.text if dialog.text else ""
+            # 只处理 403 和错误类对话框
+            if "403" in dialog_text or "error" in dialog_text.lower():
+                print(f"[浏览器] 检测到弹出对话框: {dialog_text[:50]}...")
+                self.close_403_dialog()
+        except:
+            pass
+
     def check_rate_limit(self) -> bool:
         """检测 429 限流"""
         if not self.page:
@@ -465,67 +483,132 @@ class Browser:
             return False
 
     def check_cf_403(self) -> bool:
-        """检测 CF 403 错误"""
+        """检测 CF 403 错误（对话框或页面级）"""
         if not self.page:
             return False
         try:
-            # 检测弹出对话框
-            dialog = self.page.ele("css:.dialog-body", timeout=1)
-            if dialog and "403" in dialog.text.lower():
-                print("[浏览器] 检测到 CF 403 错误")
-                return True
+            # 检测弹出对话框（多种选择器）
+            dialog_selectors = [
+                "css:.dialog-body",
+                "css:.bootbox-body",
+                "css:.modal-body",
+                "css:.discourse-modal .d-modal-body",
+            ]
+            for selector in dialog_selectors:
+                try:
+                    dialog = self.page.ele(selector, timeout=1)
+                    if dialog and "403" in dialog.text:
+                        print("[浏览器] 检测到 403 对话框")
+                        return True
+                except:
+                    continue
+
             # 检测页面级 403
             page_text = self.page.html.lower() if self.page.html else ""
             if "403 forbidden" in page_text or "<h1>403</h1>" in page_text:
-                print("[浏览器] 检测到 CF 403 页面")
+                print("[浏览器] 检测到 403 页面")
                 return True
         except:
             pass
         return False
 
     def close_403_dialog(self) -> bool:
-        """关闭 403 错误对话框"""
+        """关闭 403 错误对话框（尝试多种按钮选择器）"""
         try:
-            # 查找并点击"确定"按钮
-            ok_btn = self.page.ele("css:.dialog-footer .btn-primary", timeout=2)
-            if ok_btn:
-                ok_btn.click()
-                print("[浏览器] 已关闭 403 对话框")
+            # 按优先级尝试多种按钮选择器
+            btn_selectors = [
+                "css:.dialog-footer .btn-primary",
+                "css:.bootbox .btn-primary",
+                "css:.modal-footer .btn-primary",
+                "css:.d-modal__footer .btn-primary",
+                "css:button.btn-primary",
+                "css:.dialog-footer button",
+                "css:.modal-footer button",
+            ]
+            for selector in btn_selectors:
+                try:
+                    btn = self.page.ele(selector, timeout=1)
+                    if btn:
+                        btn_text = btn.text.strip() if btn.text else ""
+                        # 匹配常见的确认按钮文字
+                        if not btn_text or any(kw in btn_text for kw in ["确定", "OK", "ok", "确认", "知道了", "Got it"]):
+                            btn.click()
+                            print(f"[浏览器] 已关闭 403 对话框 (按钮: {btn_text or selector})")
+                            time.sleep(1)
+                            return True
+                except:
+                    continue
+
+            # 最后尝试：用 JavaScript 关闭所有对话框
+            try:
+                self.page.run_js("""
+                    // 点击所有可能的确定按钮
+                    var btns = document.querySelectorAll('.btn-primary, .bootbox .btn, .modal .btn');
+                    for (var i = 0; i < btns.length; i++) {
+                        btns[i].click();
+                    }
+                    // 移除 modal backdrop
+                    var backdrops = document.querySelectorAll('.modal-backdrop, .bootbox-backdrop');
+                    for (var i = 0; i < backdrops.length; i++) {
+                        backdrops[i].remove();
+                    }
+                """)
+                print("[浏览器] 已通过 JS 关闭对话框")
                 time.sleep(1)
                 return True
-            # 备选：查找任何对话框的确定按钮
-            ok_btn = self.page.ele("css:button.btn-primary", timeout=1)
-            if ok_btn and ("确定" in ok_btn.text or "OK" in ok_btn.text.upper()):
-                ok_btn.click()
-                print("[浏览器] 已关闭对话框")
-                time.sleep(1)
-                return True
+            except:
+                pass
         except:
             pass
         return False
 
     def handle_cf_403(self, current_url: str) -> bool:
-        """处理 CF 403 错误，等待验证完成"""
+        """处理 CF 403 错误，关闭对话框并跳转到 CF 验证页面"""
         try:
             # 1. 先关闭 403 对话框
+            print("[浏览器] 处理 403 错误...")
             self.close_403_dialog()
+            time.sleep(1)
 
-            # 2. 跳转到 challenge 页面
-            challenge_url = f"https://linux.do/challenge?redirect={current_url}"
+            # 2. 跳转到 challenge 页面触发 CF 验证
+            challenge_url = "https://linux.do/session/csrf"
             print(f"[浏览器] 跳转到验证页面...")
             self.goto(challenge_url, wait=3)
 
-            # 3. 等待 CF 验证完成（增加超时时间）
+            # 3. 检查是否还有 403 对话框（可能跳转后又弹出）
+            if self.check_cf_403():
+                self.close_403_dialog()
+                time.sleep(1)
+
+            # 4. 等待 CF 验证完成（最多 3 分钟）
+            print("[浏览器] 等待 CF 验证，最多 3 分钟...")
             if not self.wait_for_cf(timeout=180):
                 print("[浏览器] CF 验证超时，等待用户手动处理...")
                 # 额外等待用户手动处理
                 time.sleep(30)
                 return self.wait_for_cf(timeout=60)
 
+            # 5. 验证通过后回到原页面
+            print(f"[浏览器] CF 验证通过，返回原页面...")
+            time.sleep(2)
             return True
         except Exception as e:
             print(f"[浏览器] 处理 CF 403 失败: {e}")
             return False
+
+    def check_and_handle_403(self, current_url: str = None) -> bool:
+        """
+        检测并处理 403 错误（通用方法，可在任何步骤调用）
+        返回:
+            True: 没有 403 或 403 已成功处理
+            False: 403 处理失败
+        """
+        if not self.check_cf_403():
+            return True  # 没有 403，正常继续
+
+        print("[浏览器] 检测到 403，开始处理...")
+        url = current_url or self.SITE_URL if hasattr(self, 'SITE_URL') else "https://linux.do"
+        return self.handle_cf_403(url)
 
     def is_logged_in(self) -> bool:
         """检测是否已登录"""
