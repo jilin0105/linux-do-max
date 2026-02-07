@@ -167,6 +167,8 @@ configure_chromium() {
         "/usr/bin/chromium"
         "/usr/lib/chromium/chromium"
         "/snap/bin/chromium"
+        "/usr/bin/google-chrome"
+        "/usr/bin/google-chrome-stable"
     )
 
     CHROMIUM_PATH=""
@@ -178,11 +180,26 @@ configure_chromium() {
     done
 
     if [ -z "$CHROMIUM_PATH" ]; then
-        print_error "未找到 Chromium，请手动安装"
+        print_error "未找到 Chromium/Chrome，请手动安装"
         exit 1
     fi
 
     print_success "Chromium 路径: $CHROMIUM_PATH"
+
+    # 检查 config.yaml 是否被错误创建为目录
+    if [ -d "config.yaml" ]; then
+        print_warning "config.yaml 是一个目录而不是文件，正在自动修复..."
+        rm -rf "config.yaml"
+        print_success "已删除错误的 config.yaml 目录"
+    fi
+
+    # 如果 config.yaml 不存在，从 example 创建
+    if [ ! -f "config.yaml" ]; then
+        if [ -f "config.yaml.example" ]; then
+            cp config.yaml.example config.yaml
+            print_info "已从 config.yaml.example 创建配置文件"
+        fi
+    fi
 
     # 更新配置文件
     if [ -f "config.yaml" ]; then
@@ -390,6 +407,17 @@ full_install() {
 
     install_dependencies
     install_python_deps
+
+    # 确保 config.yaml 是文件而非目录
+    if [ -d "config.yaml" ]; then
+        print_warning "config.yaml 是一个目录而不是文件，正在自动修复..."
+        rm -rf "config.yaml"
+    fi
+    if [ ! -f "config.yaml" ] && [ -f "config.yaml.example" ]; then
+        cp config.yaml.example config.yaml
+        print_success "已创建默认配置文件 config.yaml"
+    fi
+
     configure_chromium
     create_user_data_dir
     test_chromium

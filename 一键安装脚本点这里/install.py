@@ -440,7 +440,19 @@ class ConfigManager:
 
     def _load(self):
         """加载配置文件"""
-        if os.path.exists(self.config_path):
+        # 检查 config.yaml 是否被错误创建为目录
+        if os.path.isdir(self.config_path):
+            print_warning(f"config.yaml 是一个目录而不是文件，正在自动修复...")
+            try:
+                import shutil as _shutil
+                _shutil.rmtree(self.config_path)
+                print_success("已删除错误的 config.yaml 目录")
+            except Exception as e:
+                print_error(f"删除 config.yaml 目录失败: {e}")
+                print_info("请手动删除后重试: rm -rf config.yaml")
+            return
+
+        if os.path.exists(self.config_path) and os.path.isfile(self.config_path):
             try:
                 import yaml
                 with open(self.config_path, "r", encoding="utf-8") as f:
@@ -476,6 +488,22 @@ class ConfigManager:
 
     def save(self):
         """保存配置文件"""
+        # 检查 config.yaml 是否被错误创建为目录
+        if os.path.isdir(self.config_path):
+            print_warning(f"config.yaml 是一个目录而不是文件，正在自动修复...")
+            try:
+                import shutil as _shutil
+                _shutil.rmtree(self.config_path)
+                print_success("已删除错误的 config.yaml 目录")
+            except Exception as e:
+                print_error(f"删除 config.yaml 目录失败: {e}")
+                return
+
+        # 确保父目录存在
+        parent_dir = os.path.dirname(os.path.abspath(self.config_path))
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+
         # 处理 chrome_args
         chrome_args = self.config.get('chrome_args', [])
         if isinstance(chrome_args, list) and chrome_args:
@@ -1313,7 +1341,12 @@ class Installer:
         print()
 
         # 检查是否已有配置
-        if os.path.exists("config.yaml"):
+        if os.path.isdir("config.yaml"):
+            print_warning("config.yaml 是一个目录而不是文件，正在自动修复...")
+            import shutil as _shutil
+            _shutil.rmtree("config.yaml")
+            print_success("已删除错误的 config.yaml 目录")
+        elif os.path.isfile("config.yaml"):
             print_warning("检测到已有配置文件")
             choice = input("是否重新配置？[y/N]: ").strip().lower()
             if choice not in ("y", "yes"):

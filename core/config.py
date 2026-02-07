@@ -20,7 +20,28 @@ class Config:
         if config_path is None:
             config_path = Path(__file__).parent.parent / "config.yaml"
 
-        if Path(config_path).exists():
+        config_path = Path(config_path)
+
+        # 检查 config.yaml 是否被错误创建为目录（Docker 卷映射常见问题）
+        if config_path.is_dir():
+            print(f"[警告] {config_path} 是一个目录而不是文件！")
+            print("[警告] 这通常是 Docker 卷映射导致的，正在自动修复...")
+            try:
+                import shutil
+                shutil.rmtree(config_path)
+                print("[信息] 已删除错误的目录")
+                # 尝试从 example 复制
+                example_path = config_path.parent / "config.yaml.example"
+                if example_path.exists():
+                    import shutil
+                    shutil.copy2(example_path, config_path)
+                    print("[信息] 已从 config.yaml.example 创建默认配置文件")
+            except Exception as e:
+                print(f"[错误] 自动修复失败: {e}")
+                print("[信息] 请手动删除 config.yaml 目录并创建配置文件")
+                return
+
+        if config_path.exists() and config_path.is_file():
             with open(config_path, "r", encoding="utf-8") as f:
                 self._config = yaml.safe_load(f) or {}
 

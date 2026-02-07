@@ -26,6 +26,7 @@ debug*.html
 
 # Config with secrets
 config.yaml
+config/
 
 # OS
 .DS_Store

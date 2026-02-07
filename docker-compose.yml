@@ -4,25 +4,21 @@ services:
   linuxdo-checkin:
     build: .
     container_name: linuxdo-checkin
-    restart: unless-stopped
+    # 签到是一次性任务，不需要自动重启
+    # 定时执行由 ofelia 调度器负责
+    restart: "no"
     volumes:
       # 持久化用户数据目录（保存登录状态）
       - ./data/browser:/root/.linuxdo-browser
       # 持久化日志
       - ./logs:/app/logs
-      # 配置文件（可选，也可以用环境变量）
-      - ./config.yaml:/app/config.yaml:ro
+      # 配置目录映射（将宿主机 ./config/ 目录映射到容器内 /app/config/）
+      # 首次使用: cp config.yaml.example config/config.yaml && 编辑 config/config.yaml
+      # 修改配置后重启容器即可生效
+      - ./config:/app/config
     environment:
-      # 账号配置（可选）
-      - LINUXDO_USERNAME=
-      - LINUXDO_PASSWORD=
-      # Telegram 通知
-      - TG_BOT_TOKEN=
-      - TG_CHAT_ID=
-      # 签到配置
-      - BROWSE_COUNT=10
-      - LIKE_PROBABILITY=0.3
-      # 浏览器配置
+      # 环境变量优先级高于 config.yaml
+      # 建议将配置写在 config.yaml 中，环境变量仅用于覆盖
       - HEADLESS=false
 
   # 定时任务调度器（使用 ofelia）
