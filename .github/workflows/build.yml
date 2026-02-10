@@ -8,6 +8,9 @@ on:
   # 允许手动触发
   workflow_dispatch:
 
+env:
+  TAG_VERSION: ${{ github.ref_name }}
+
 jobs:
   # Windows x64 打包
   build-windows:
@@ -25,13 +28,17 @@ jobs:
         shell: python
         run: |
           import re, os
-          tag = os.environ.get('GITHUB_REF_NAME', '').lstrip('v')
+          tag = os.environ.get('TAG_VERSION', '').lstrip('v')
           if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              with open('version.py', 'r') as f:
+                  text = f.read()
               parts = tag.split('.')
-              content = f'# 版本信息\n__version__ = "{tag}"\n__version_info__ = ({", ".join(parts)})\n\n# GitHub 仓库信息\nGITHUB_REPO = "xtgm/linux-do-max"\nGITHUB_API = f"https://api.github.com/repos/{{GITHUB_REPO}}/releases/latest"\n'
+              info = '(' + ', '.join(parts) + ')'
+              text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
+              text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
               with open('version.py', 'w') as f:
-                  f.write(content)
-              print(f"版本号已更新为 {tag}")
+                  f.write(text)
+              print('version.py updated to ' + tag)
 
       - name: 安装依赖
         run: |
@@ -64,13 +71,17 @@ jobs:
         shell: python
         run: |
           import re, os
-          tag = os.environ.get('GITHUB_REF_NAME', '').lstrip('v')
+          tag = os.environ.get('TAG_VERSION', '').lstrip('v')
           if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              with open('version.py', 'r') as f:
+                  text = f.read()
               parts = tag.split('.')
-              content = f'# 版本信息\n__version__ = "{tag}"\n__version_info__ = ({", ".join(parts)})\n\n# GitHub 仓库信息\nGITHUB_REPO = "xtgm/linux-do-max"\nGITHUB_API = f"https://api.github.com/repos/{{GITHUB_REPO}}/releases/latest"\n'
+              info = '(' + ', '.join(parts) + ')'
+              text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
+              text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
               with open('version.py', 'w') as f:
-                  f.write(content)
-              print(f"版本号已更新为 {tag}")
+                  f.write(text)
+              print('version.py updated to ' + tag)
 
       - name: 安装依赖
         run: |
@@ -103,13 +114,17 @@ jobs:
         shell: python
         run: |
           import re, os
-          tag = os.environ.get('GITHUB_REF_NAME', '').lstrip('v')
+          tag = os.environ.get('TAG_VERSION', '').lstrip('v')
           if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              with open('version.py', 'r') as f:
+                  text = f.read()
               parts = tag.split('.')
-              content = f'# 版本信息\n__version__ = "{tag}"\n__version_info__ = ({", ".join(parts)})\n\n# GitHub 仓库信息\nGITHUB_REPO = "xtgm/linux-do-max"\nGITHUB_API = f"https://api.github.com/repos/{{GITHUB_REPO}}/releases/latest"\n'
+              info = '(' + ', '.join(parts) + ')'
+              text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
+              text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
               with open('version.py', 'w') as f:
-                  f.write(content)
-              print(f"版本号已更新为 {tag}")
+                  f.write(text)
+              print('version.py updated to ' + tag)
 
       - name: 安装依赖
         run: |
@@ -142,13 +157,17 @@ jobs:
         shell: python
         run: |
           import re, os
-          tag = os.environ.get('GITHUB_REF_NAME', '').lstrip('v')
+          tag = os.environ.get('TAG_VERSION', '').lstrip('v')
           if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              with open('version.py', 'r') as f:
+                  text = f.read()
               parts = tag.split('.')
-              content = f'# 版本信息\n__version__ = "{tag}"\n__version_info__ = ({", ".join(parts)})\n\n# GitHub 仓库信息\nGITHUB_REPO = "xtgm/linux-do-max"\nGITHUB_API = f"https://api.github.com/repos/{{GITHUB_REPO}}/releases/latest"\n'
+              info = '(' + ', '.join(parts) + ')'
+              text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
+              text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
               with open('version.py', 'w') as f:
-                  f.write(content)
-              print(f"版本号已更新为 {tag}")
+                  f.write(text)
+              print('version.py updated to ' + tag)
 
       - name: 安装依赖
         run: |
@@ -176,13 +195,17 @@ jobs:
         shell: python
         run: |
           import re, os
-          tag = os.environ.get('GITHUB_REF_NAME', '').lstrip('v')
+          tag = os.environ.get('TAG_VERSION', '').lstrip('v')
           if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              with open('version.py', 'r') as f:
+                  text = f.read()
               parts = tag.split('.')
-              content = f'# 版本信息\n__version__ = "{tag}"\n__version_info__ = ({", ".join(parts)})\n\n# GitHub 仓库信息\nGITHUB_REPO = "xtgm/linux-do-max"\nGITHUB_API = f"https://api.github.com/repos/{{GITHUB_REPO}}/releases/latest"\n'
+              info = '(' + ', '.join(parts) + ')'
+              text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
+              text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
               with open('version.py', 'w') as f:
-                  f.write(content)
-              print(f"版本号已更新为 {tag}")
+                  f.write(text)
+              print('version.py updated to ' + tag)
 
       - name: 设置 QEMU
         uses: docker/setup-qemu-action@v3
