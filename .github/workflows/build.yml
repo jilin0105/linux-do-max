@@ -21,6 +21,18 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: 自动更新版本号
+        shell: python
+        run: |
+          import re, os
+          tag = os.environ.get('GITHUB_REF_NAME', '').lstrip('v')
+          if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              parts = tag.split('.')
+              content = f'# 版本信息\n__version__ = "{tag}"\n__version_info__ = ({", ".join(parts)})\n\n# GitHub 仓库信息\nGITHUB_REPO = "xtgm/linux-do-max"\nGITHUB_API = f"https://api.github.com/repos/{{GITHUB_REPO}}/releases/latest"\n'
+              with open('version.py', 'w') as f:
+                  f.write(content)
+              print(f"版本号已更新为 {tag}")
+
       - name: 安装依赖
         run: |
           pip install pyinstaller
@@ -47,6 +59,18 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: 自动更新版本号
+        shell: python
+        run: |
+          import re, os
+          tag = os.environ.get('GITHUB_REF_NAME', '').lstrip('v')
+          if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              parts = tag.split('.')
+              content = f'# 版本信息\n__version__ = "{tag}"\n__version_info__ = ({", ".join(parts)})\n\n# GitHub 仓库信息\nGITHUB_REPO = "xtgm/linux-do-max"\nGITHUB_API = f"https://api.github.com/repos/{{GITHUB_REPO}}/releases/latest"\n'
+              with open('version.py', 'w') as f:
+                  f.write(content)
+              print(f"版本号已更新为 {tag}")
 
       - name: 安装依赖
         run: |
@@ -75,6 +99,18 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: 自动更新版本号
+        shell: python
+        run: |
+          import re, os
+          tag = os.environ.get('GITHUB_REF_NAME', '').lstrip('v')
+          if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              parts = tag.split('.')
+              content = f'# 版本信息\n__version__ = "{tag}"\n__version_info__ = ({", ".join(parts)})\n\n# GitHub 仓库信息\nGITHUB_REPO = "xtgm/linux-do-max"\nGITHUB_API = f"https://api.github.com/repos/{{GITHUB_REPO}}/releases/latest"\n'
+              with open('version.py', 'w') as f:
+                  f.write(content)
+              print(f"版本号已更新为 {tag}")
+
       - name: 安装依赖
         run: |
           pip install pyinstaller
@@ -102,6 +138,18 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: 自动更新版本号
+        shell: python
+        run: |
+          import re, os
+          tag = os.environ.get('GITHUB_REF_NAME', '').lstrip('v')
+          if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              parts = tag.split('.')
+              content = f'# 版本信息\n__version__ = "{tag}"\n__version_info__ = ({", ".join(parts)})\n\n# GitHub 仓库信息\nGITHUB_REPO = "xtgm/linux-do-max"\nGITHUB_API = f"https://api.github.com/repos/{{GITHUB_REPO}}/releases/latest"\n'
+              with open('version.py', 'w') as f:
+                  f.write(content)
+              print(f"版本号已更新为 {tag}")
+
       - name: 安装依赖
         run: |
           pip install pyinstaller
@@ -123,6 +171,18 @@ jobs:
     steps:
       - name: 检出代码
         uses: actions/checkout@v4
+
+      - name: 自动更新版本号
+        shell: python
+        run: |
+          import re, os
+          tag = os.environ.get('GITHUB_REF_NAME', '').lstrip('v')
+          if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              parts = tag.split('.')
+              content = f'# 版本信息\n__version__ = "{tag}"\n__version_info__ = ({", ".join(parts)})\n\n# GitHub 仓库信息\nGITHUB_REPO = "xtgm/linux-do-max"\nGITHUB_API = f"https://api.github.com/repos/{{GITHUB_REPO}}/releases/latest"\n'
+              with open('version.py', 'w') as f:
+                  f.write(content)
+              print(f"版本号已更新为 {tag}")
 
       - name: 设置 QEMU
         uses: docker/setup-qemu-action@v3
