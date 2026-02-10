@@ -30,13 +30,13 @@ jobs:
           import re, os
           tag = os.environ.get('TAG_VERSION', '').lstrip('v')
           if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
-              with open('version.py', 'r') as f:
+              with open('version.py', 'r', encoding='utf-8') as f:
                   text = f.read()
               parts = tag.split('.')
               info = '(' + ', '.join(parts) + ')'
               text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
               text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
-              with open('version.py', 'w') as f:
+              with open('version.py', 'w', encoding='utf-8') as f:
                   f.write(text)
               print('version.py updated to ' + tag)
 
@@ -73,13 +73,13 @@ jobs:
           import re, os
           tag = os.environ.get('TAG_VERSION', '').lstrip('v')
           if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
-              with open('version.py', 'r') as f:
+              with open('version.py', 'r', encoding='utf-8') as f:
                   text = f.read()
               parts = tag.split('.')
               info = '(' + ', '.join(parts) + ')'
               text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
               text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
-              with open('version.py', 'w') as f:
+              with open('version.py', 'w', encoding='utf-8') as f:
                   f.write(text)
               print('version.py updated to ' + tag)
 
@@ -116,13 +116,13 @@ jobs:
           import re, os
           tag = os.environ.get('TAG_VERSION', '').lstrip('v')
           if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
-              with open('version.py', 'r') as f:
+              with open('version.py', 'r', encoding='utf-8') as f:
                   text = f.read()
               parts = tag.split('.')
               info = '(' + ', '.join(parts) + ')'
               text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
               text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
-              with open('version.py', 'w') as f:
+              with open('version.py', 'w', encoding='utf-8') as f:
                   f.write(text)
               print('version.py updated to ' + tag)
 
@@ -159,13 +159,13 @@ jobs:
           import re, os
           tag = os.environ.get('TAG_VERSION', '').lstrip('v')
           if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
-              with open('version.py', 'r') as f:
+              with open('version.py', 'r', encoding='utf-8') as f:
                   text = f.read()
               parts = tag.split('.')
               info = '(' + ', '.join(parts) + ')'
               text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
               text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
-              with open('version.py', 'w') as f:
+              with open('version.py', 'w', encoding='utf-8') as f:
                   f.write(text)
               print('version.py updated to ' + tag)
 
@@ -197,13 +197,13 @@ jobs:
           import re, os
           tag = os.environ.get('TAG_VERSION', '').lstrip('v')
           if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
-              with open('version.py', 'r') as f:
+              with open('version.py', 'r', encoding='utf-8') as f:
                   text = f.read()
               parts = tag.split('.')
               info = '(' + ', '.join(parts) + ')'
               text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
               text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
-              with open('version.py', 'w') as f:
+              with open('version.py', 'w', encoding='utf-8') as f:
                   f.write(text)
               print('version.py updated to ' + tag)
 
