@@ -117,12 +117,21 @@ class Notifier:
             # 进度项配置（key, 显示名称, 单位）
             progress_items = [
                 ('visit_days', '访问天数', '天'),
+                ('replies', '回复话题', '个'),
+                ('topics_viewed', '浏览话题', '个'),
+                ('posts_read', '浏览帖子', '篇'),
+                ('flagged_posts', '被举报帖子', '个'),
+                ('flagged_by_users', '举报用户数', '个'),
                 ('likes_given', '点赞', '次'),
                 ('likes_received', '获赞', '次'),
-                ('replies', '回复的话题', '个'),
-                ('topics_viewed', '浏览的话题', '个'),
-                ('posts_read', '已读帖子', '篇'),
+                ('likes_received_days', '获赞天数', '天'),
+                ('likes_received_users', '点赞用户数', '人'),
+                ('silenced', '被禁言', '次'),
+                ('suspended', '被封禁', '次'),
             ]
+
+            # "最多"类型的项目（当前值越小越好）
+            max_type_keys = {'flagged_posts', 'flagged_by_users', 'silenced', 'suspended'}
 
             for key, label, unit in progress_items:
                 if key in progress:
@@ -138,8 +147,11 @@ class Notifier:
                         msg_lines.append(f"├ {icon} {label}：{current}{unit}/{required}{unit}")
                     else:
                         icon = "⏳"
-                        diff = required - current
-                        msg_lines.append(f"├ {icon} {label}：{current}{unit}/{required}{unit} (差{diff}{unit})")
+                        if key in max_type_keys:
+                            msg_lines.append(f"├ {icon} {label}：{current}{unit} (最多{required}{unit})")
+                        else:
+                            diff = required - current
+                            msg_lines.append(f"├ {icon} {label}：{current}{unit}/{required}{unit} (差{diff}{unit})")
 
             # 完成度
             if total > 0:
@@ -156,8 +168,11 @@ class Notifier:
 
         elif level == 1:
             msg_lines.append("")
-            msg_lines.append("📈 升级进度 (1→2 级)")
-            msg_lines.append("⏳ 1级用户需要访问 connect.linux.do 查看进度")
+            msg_lines.append("📈 当前 1 级，达到 2 级可查看升级进度详情")
+            msg_lines.append("💡 继续参与社区，解锁更多功能！")
+        elif level >= 2:
+            msg_lines.append("")
+            msg_lines.append("📈 升级进度获取失败，请访问 connect.linux.do 查看")
 
         message = "\n".join(msg_lines)
 

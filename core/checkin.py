@@ -281,19 +281,54 @@ class Checkin:
             time.sleep(wait)
 
             # 从页面 HTML 解析等级
-            # 格式: "你好，用户名 (username) 2级用户"
+            # 新版格式: "信任级别 2"（在用户菜单中）
+            # 旧版格式: "2级用户"
             html = self.browser.page.html
-            match = re.search(r'(\d+)级用户', html)
+            match = re.search(r'信任级别\s*(\d+)', html)
+            if not match:
+                match = re.search(r'(\d+)级用户', html)
             if match:
                 self.level = int(match.group(1))
                 print(f"[签到] 用户等级: {self.level}")
             else:
                 print("[签到] 未能解析用户等级")
 
-            # 同时解析升级进度（避免重复访问）
-            self.progress = self._parse_progress_from_html(html)
+            # 1级用户没有进度表格，页面只显示"达到 2 级可查看"
+            if self.level < 2:
+                print("[签到] 1级用户无进度表格，跳过")
+                return
+
+            # 等待进度表格渲染完成（最多 15 秒）
+            table_found = False
+            for _ in range(30):
+                try:
+                    table = self.browser.page.ele("css:.data-table", timeout=0.3)
+                    if table:
+                        table_found = True
+                        break
+                except:
+                    pass
+                time.sleep(0.5)
+
+            if not table_found:
+                # 再尝试 tl3-table
+                try:
+                    table = self.browser.page.ele("css:.tl3-table", timeout=3)
+                    if table:
+                        table_found = True
+                except:
+                    pass
+
+            if table_found:
+                # 表格出现了，等待内容完全渲染
+                time.sleep(1)
+                html = self.browser.page.html
+                self.progress = self._parse_progress_from_html(html)
+
             if self.progress:
                 print(f"[签到] 获取到升级进度: {len(self.progress)} 项")
+            else:
+                print("[签到] 未获取到升级进度")
 
         except Exception as e:
             print(f"[签到] 获取用户信息异常: {e}")
@@ -611,11 +646,11 @@ class Checkin:
         if self.progress:
             return
 
-        if self.level < 1:
-            print("[签到] 等级未知，跳过获取进度")
+        if self.level < 2:
+            print("[签到] 等级低于2级，无进度表格可获取")
             return
 
-        print("[签到] 获取升级进度...")
+        print("[签到] 重新获取升级进度...")
 
         try:
             # 访问 connect.linux.do
@@ -624,9 +659,30 @@ class Checkin:
             # 等待 CF 验证
             self.browser.wait_for_cf(timeout=60)
 
-            # 解析进度信息
-            html = self.browser.page.html
-            self.progress = self._parse_progress_from_html(html)
+            # 等待表格渲染（最多 15 秒）
+            table_found = False
+            for _ in range(30):
+                try:
+                    table = self.browser.page.ele("css:.data-table", timeout=0.3)
+                    if table:
+                        table_found = True
+                        break
+                except:
+                    pass
+                time.sleep(0.5)
+
+            if not table_found:
+                try:
+                    table = self.browser.page.ele("css:.tl3-table", timeout=3)
+                    if table:
+                        table_found = True
+                except:
+                    pass
+
+            if table_found:
+                time.sleep(1)
+                html = self.browser.page.html
+                self.progress = self._parse_progress_from_html(html)
 
             if self.progress:
                 print(f"[签到] 获取到升级进度: {len(self.progress)} 项")
@@ -641,26 +697,46 @@ class Checkin:
         progress = {}
 
         try:
-            # 解析表格行，格式:
+            # 新版页面格式（2026-02 更新）:
+            # <td>访问天数</td>
+            # <td data-label="当前" class="status-unmet">24</td>
+            # <td data-label="要求">50 天</td>
+            #
+            # 旧版页面格式:
             # <td>访问次数</td>
             # <td class="text-red-500">14% (14 / 100 天数)</td>
             # <td>50%</td>
 
-            # 定义要解析的项目（key, 页面标签名）
+            # 定义要解析的项目（key, [新版标签, 旧版标签]）
             items = [
-                ('visit_days', '访问次数'),
-                ('replies', '回复的话题'),
-                ('topics_viewed', '浏览的话题'),
-                ('posts_read', '已读帖子'),
-                ('likes_given', '点赞'),
-                ('likes_received', '获赞'),
+                ('visit_days', ['访问天数', '访问次数']),
+                ('replies', ['回复话题', '回复的话题']),
+                ('topics_viewed', ['浏览话题', '浏览的话题']),
+                ('posts_read', ['浏览帖子', '已读帖子']),
+                ('flagged_posts', ['被举报的帖子']),
+                ('flagged_by_users', ['发起举报的用户']),
+                ('likes_given', ['点赞']),
+                ('likes_received', ['获赞']),
+                ('likes_received_days', ['获赞：被点赞的天数']),
+                ('likes_received_users', ['获赞：点赞用户数量']),
+                ('silenced', ['被禁言（过去 6 个月）']),
+                ('suspended', ['被封禁（过去 6 个月）']),
             ]
 
-            for key, label in items:
-                # 匹配表格行: <td>标签</td> <td class="...">当前值</td> <td>要求值</td>
-                # 注意：标签可能有额外文字如"（所有时间）"，我们只匹配精确的标签
-                pattern = rf'<td[^>]*>\s*{re.escape(label)}\s*</td>\s*<td[^>]*class="(text-(?:red|green)-500)"[^>]*>\s*([^<]+?)\s*</td>\s*<td[^>]*>\s*([^<]+?)\s*</td>'
-                match = re.search(pattern, html)
+            for key, labels in items:
+                match = None
+                for label in labels:
+                    # 新版格式: class="status-met" 或 class="status-unmet"
+                    pattern = rf'<td[^>]*>\s*{re.escape(label)}\s*</td>\s*<td[^>]*class="(status-(?:met|unmet))"[^>]*>\s*([^<]+?)\s*</td>\s*<td[^>]*>\s*([^<]+?)\s*</td>'
+                    match = re.search(pattern, html)
+                    if match:
+                        break
+                    # 旧版格式: class="text-red-500" 或 class="text-green-500"
+                    pattern = rf'<td[^>]*>\s*{re.escape(label)}\s*</td>\s*<td[^>]*class="(text-(?:red|green)-500)"[^>]*>\s*([^<]+?)\s*</td>\s*<td[^>]*>\s*([^<]+?)\s*</td>'
+                    match = re.search(pattern, html)
+                    if match:
+                        break
+
                 if match:
                     status_class = match.group(1)
                     current_text = match.group(2).strip()
@@ -668,12 +744,15 @@ class Checkin:
 
                     # 解析当前值和要求值
                     current = self._parse_progress_value(current_text)
-                    required = self._parse_required_value(required_text, label)
+                    required = self._parse_required_value(required_text, labels[0])
+
+                    # 判断完成状态（兼容新旧版）
+                    completed = 'met' in status_class and 'unmet' not in status_class
 
                     progress[key] = {
                         'current': current,
                         'required': required,
-                        'completed': 'green' in status_class,
+                        'completed': completed,
                         'current_text': current_text,
                         'required_text': required_text,
                     }
@@ -685,7 +764,10 @@ class Checkin:
 
     def _parse_progress_value(self, text: str) -> int:
         """解析当前进度值"""
-        # 格式1: 14% (14 / 100 天数) -> 取括号内第一个数字 14
+        # 去除千分位逗号（新版格式如 33,853）
+        text = text.replace(',', '')
+
+        # 格式1: 14% (14 / 100 天数) -> 取括号内第一个数字 14（旧版）
         match = re.search(r'\((\d+)\s*/', text)
         if match:
             return int(match.group(1))
@@ -709,14 +791,16 @@ class Checkin:
 
     def _parse_required_value(self, text: str, label: str) -> int:
         """解析要求值"""
-        # 格式1: 50% -> 对于访问次数，50% of 100天 = 50天
+        # 去除千分位逗号
+        text = text.replace(',', '')
+
+        # 格式1: 50% -> 对于访问次数，50% of 100天 = 50天（旧版）
         if '%' in text:
             match = re.search(r'(\d+)%', text)
             if match:
                 percent = int(match.group(1))
-                # 访问次数的要求是百分比，基数是100天
                 if '访问' in label:
-                    return percent  # 50% -> 50天
+                    return percent
                 return percent
 
         # 格式2: 最多 5 个 -> 5
@@ -724,9 +808,9 @@ class Checkin:
         if match:
             return int(match.group(1))
 
-        # 格式3: 纯数字 20000 -> 20000
-        match = re.search(r'(\d+)', text)
+        # 格式3: 50 天 / 20,000 等带单位的数字
+        match = re.search(r'([\d,]+)', text)
         if match:
-            return int(match.group(1))
+            return int(match.group(1).replace(',', ''))
 
         return 0
