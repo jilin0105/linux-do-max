@@ -7,12 +7,32 @@ set SCRIPT_DIR=%~dp0
 set PROJECT_DIR=%SCRIPT_DIR%..
 cd /d "%PROJECT_DIR%"
 
-:: 检查 Python
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo [错误] 未找到 Python，请先安装 Python
+:: 检查 Python（优先使用 venv）
+set "PYTHON_CMD="
+if exist "%PROJECT_DIR%\venv\Scripts\python.exe" (
+    set "PYTHON_CMD=%PROJECT_DIR%\venv\Scripts\python.exe"
+) else (
+    where python >nul 2>&1
+    if not errorlevel 1 (
+        for /f "delims=" %%i in ('where python') do set "PYTHON_CMD=%%i"
+    )
+)
+
+if "%PYTHON_CMD%"=="" (
+    echo [错误] 未找到 Python，请先安装 Python 或运行一键安装脚本
     pause
     exit /b 1
+)
+
+:: 检查 config.yaml 是否被错误创建为目录
+if exist "config.yaml\*" (
+    echo [警告] config.yaml 是一个目录而不是文件，正在自动修复...
+    rmdir /s /q "config.yaml"
+    echo [信息] 已删除错误的 config.yaml 目录
+    if exist "config.yaml.example" (
+        copy "config.yaml.example" "config.yaml" >nul
+        echo [信息] 已从 config.yaml.example 创建默认配置文件
+    )
 )
 
 echo.
@@ -126,7 +146,7 @@ pause
 goto menu
 
 :create_single_task
-:: 参数: %1=序号, %2=时间(HH:MM)
+:: 参数: %1=序号, %2=时间（HH:MM）
 set task_num=%1
 set task_time=%2
 
@@ -145,7 +165,7 @@ if %minute% LSS 10 set minute=0%minute%
 set checkin_time=%hour%:%minute%
 
 :: 创建提醒任务
-schtasks /create /tn "LinuxDO-Reminder-%task_num%" /tr "python \"%PROJECT_DIR%\reminder.py\"" /sc daily /st %task_time% /f >nul 2>&1
+schtasks /create /tn "LinuxDO-Reminder-%task_num%" /tr "\"%PYTHON_CMD%\" \"%PROJECT_DIR%\reminder.py\"" /sc daily /st %task_time% /f >nul 2>&1
 if errorlevel 1 (
     echo [错误] 创建提醒任务 %task_num% 失败
 ) else (
@@ -153,7 +173,7 @@ if errorlevel 1 (
 )
 
 :: 创建签到任务
-schtasks /create /tn "LinuxDO-Checkin-%task_num%" /tr "python \"%PROJECT_DIR%\main.py\"" /sc daily /st %checkin_time% /f >nul 2>&1
+schtasks /create /tn "LinuxDO-Checkin-%task_num%" /tr "\"%PYTHON_CMD%\" \"%PROJECT_DIR%\main.py\"" /sc daily /st %checkin_time% /f >nul 2>&1
 if errorlevel 1 (
     echo [错误] 创建签到任务 %task_num% 失败
 ) else (
@@ -199,7 +219,7 @@ echo.
 echo [信息] 立即运行签到...
 echo.
 cd /d "%PROJECT_DIR%"
-python main.py
+%PYTHON_CMD% main.py
 echo.
 pause
 goto menu
@@ -209,7 +229,7 @@ echo.
 echo [信息] 首次登录模式...
 echo.
 cd /d "%PROJECT_DIR%"
-python main.py --first-login
+%PYTHON_CMD% main.py --first-login
 echo.
 pause
 goto menu
@@ -219,7 +239,7 @@ echo.
 echo [信息] 测试 Telegram 提醒...
 echo.
 cd /d "%PROJECT_DIR%"
-python reminder.py
+%PYTHON_CMD% reminder.py
 echo.
 pause
 goto menu

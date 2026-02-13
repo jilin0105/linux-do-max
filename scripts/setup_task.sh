@@ -10,8 +10,28 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 PLIST_DIR="$HOME/Library/LaunchAgents"
 
-# Python 路径
-PYTHON_PATH=$(which python3 || which python)
+# Python 路径（优先使用 venv）
+if [ -f "$PROJECT_DIR/venv/bin/python" ]; then
+    PYTHON_PATH="$PROJECT_DIR/venv/bin/python"
+elif command -v python3 &>/dev/null; then
+    PYTHON_PATH=$(which python3)
+elif command -v python &>/dev/null; then
+    PYTHON_PATH=$(which python)
+else
+    echo "[错误] 未找到 Python，请先安装 Python 或运行一键安装脚本"
+    exit 1
+fi
+
+# 检查 config.yaml 是否被错误创建为目录
+if [ -d "$PROJECT_DIR/config.yaml" ]; then
+    echo "[警告] config.yaml 是一个目录而不是文件，正在自动修复..."
+    rm -rf "$PROJECT_DIR/config.yaml"
+    echo "[信息] 已删除错误的 config.yaml 目录"
+    if [ -f "$PROJECT_DIR/config.yaml.example" ]; then
+        cp "$PROJECT_DIR/config.yaml.example" "$PROJECT_DIR/config.yaml"
+        echo "[信息] 已从 config.yaml.example 创建默认配置文件"
+    fi
+fi
 
 echo "┌──────────────────────────────────────────┐"
 echo "│   LinuxDO 签到 - macOS 定时任务设置    │"
@@ -36,7 +56,7 @@ show_menu() {
     echo "│  8. 退出                                 │"
     echo "└──────────────────────────────────────────┘"
     echo ""
-    read -p "请输入选项 (1-8): " choice
+    read -p "请输入选项（1-8）: " choice
 }
 
 # 创建 plist 文件
@@ -268,6 +288,6 @@ while true; do
         *) echo "[错误] 无效选项" ;;
     esac
 
-    read -p "按 Enter 键继续..."
+    read -p "按回车键继续..."
     echo ""
 done

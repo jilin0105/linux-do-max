@@ -298,26 +298,21 @@ class Checkin:
                 print("[签到] 1级用户无进度表格，跳过")
                 return
 
-            # 等待进度表格渲染完成（最多 15 秒）
+            # 等待进度卡片渲染完成（最多 15 秒）
             table_found = False
+            selectors = ['.tl3-rings', '.tl3-bars']
             for _ in range(30):
-                try:
-                    table = self.browser.page.ele("css:.data-table", timeout=0.3)
-                    if table:
-                        table_found = True
-                        break
-                except:
-                    pass
+                for sel in selectors:
+                    try:
+                        el = self.browser.page.ele(f"css:{sel}", timeout=0.3)
+                        if el:
+                            table_found = True
+                            break
+                    except:
+                        pass
+                if table_found:
+                    break
                 time.sleep(0.5)
-
-            if not table_found:
-                # 再尝试 tl3-table
-                try:
-                    table = self.browser.page.ele("css:.tl3-table", timeout=3)
-                    if table:
-                        table_found = True
-                except:
-                    pass
 
             if table_found:
                 # 表格出现了，等待内容完全渲染
@@ -659,25 +654,21 @@ class Checkin:
             # 等待 CF 验证
             self.browser.wait_for_cf(timeout=60)
 
-            # 等待表格渲染（最多 15 秒）
+            # 等待卡片渲染（最多 15 秒）
             table_found = False
+            selectors = ['.tl3-rings', '.tl3-bars']
             for _ in range(30):
-                try:
-                    table = self.browser.page.ele("css:.data-table", timeout=0.3)
-                    if table:
-                        table_found = True
-                        break
-                except:
-                    pass
+                for sel in selectors:
+                    try:
+                        el = self.browser.page.ele(f"css:{sel}", timeout=0.3)
+                        if el:
+                            table_found = True
+                            break
+                    except:
+                        pass
+                if table_found:
+                    break
                 time.sleep(0.5)
-
-            if not table_found:
-                try:
-                    table = self.browser.page.ele("css:.tl3-table", timeout=3)
-                    if table:
-                        table_found = True
-                except:
-                    pass
 
             if table_found:
                 time.sleep(1)
@@ -693,69 +684,58 @@ class Checkin:
             print(f"[签到] 获取进度异常: {e}")
 
     def _parse_progress_from_html(self, html: str) -> Optional[Dict]:
-        """从 HTML 解析升级进度表格"""
+        """从 HTML 解析升级进度（卡片布局：tl3-rings/tl3-bars/tl3-quota/tl3-veto）"""
         progress = {}
 
         try:
-            # 新版页面格式（2026-02 更新）:
-            # <td>访问天数</td>
-            # <td data-label="当前" class="status-unmet">24</td>
-            # <td data-label="要求">50 天</td>
-            #
-            # 旧版页面格式:
-            # <td>访问次数</td>
-            # <td class="text-red-500">14% (14 / 100 天数)</td>
-            # <td>50%</td>
-
-            # 定义要解析的项目（key, [新版标签, 旧版标签]）
-            items = [
-                ('visit_days', ['访问天数', '访问次数']),
-                ('replies', ['回复话题', '回复的话题']),
-                ('topics_viewed', ['浏览话题', '浏览的话题']),
-                ('posts_read', ['浏览帖子', '已读帖子']),
-                ('flagged_posts', ['被举报的帖子']),
-                ('flagged_by_users', ['发起举报的用户']),
-                ('likes_given', ['点赞']),
-                ('likes_received', ['获赞']),
-                ('likes_received_days', ['获赞：被点赞的天数']),
-                ('likes_received_users', ['获赞：点赞用户数量']),
-                ('silenced', ['被禁言（过去 6 个月）']),
-                ('suspended', ['被封禁（过去 6 个月）']),
-            ]
-
-            for key, labels in items:
-                match = None
-                for label in labels:
-                    # 新版格式: class="status-met" 或 class="status-unmet"
-                    pattern = rf'<td[^>]*>\s*{re.escape(label)}\s*</td>\s*<td[^>]*class="(status-(?:met|unmet))"[^>]*>\s*([^<]+?)\s*</td>\s*<td[^>]*>\s*([^<]+?)\s*</td>'
-                    match = re.search(pattern, html)
-                    if match:
-                        break
-                    # 旧版格式: class="text-red-500" 或 class="text-green-500"
-                    pattern = rf'<td[^>]*>\s*{re.escape(label)}\s*</td>\s*<td[^>]*class="(text-(?:red|green)-500)"[^>]*>\s*([^<]+?)\s*</td>\s*<td[^>]*>\s*([^<]+?)\s*</td>'
-                    match = re.search(pattern, html)
-                    if match:
-                        break
-
-                if match:
-                    status_class = match.group(1)
-                    current_text = match.group(2).strip()
-                    required_text = match.group(3).strip()
-
-                    # 解析当前值和要求值
+            # 环形图（访问天数、浏览话题、浏览帖子）
+            ring_pattern = r'<div\s+class="tl3-ring-circle\s+(met|unmet)"[^>]*>.*?<span\s+class="tl3-ring-current"[^>]*>(.*?)</span>\s*<span\s+class="tl3-ring-target"[^>]*>(.*?)</span>.*?<div\s+class="tl3-ring-label"[^>]*>(.*?)</div>'
+            ring_map = {'访问天数': 'visit_days', '浏览话题': 'topics_viewed', '浏览帖子': 'posts_read'}
+            for m in re.finditer(ring_pattern, html, re.DOTALL):
+                status, current_text, target_text, label = m.group(1), m.group(2).strip(), m.group(3).strip(), m.group(4).strip()
+                key = ring_map.get(label)
+                if key:
                     current = self._parse_progress_value(current_text)
-                    required = self._parse_required_value(required_text, labels[0])
+                    required = self._parse_progress_value(target_text)
+                    progress[key] = {'current': current, 'required': required, 'completed': status == 'met', 'current_text': current_text, 'required_text': target_text}
 
-                    # 判断完成状态（兼容新旧版）
-                    completed = 'met' in status_class and 'unmet' not in status_class
+            # 进度条（回复话题、点赞、获赞、获赞天数、获赞用户）
+            bar_pattern = r'<span\s+class="tl3-bar-label"[^>]*>(.*?)</span>\s*<span\s+class="tl3-bar-nums\s+(met|unmet)"[^>]*>(.*?)</span>'
+            bar_map = {'回复话题': 'replies', '点赞': 'likes_given', '获赞': 'likes_received', '获赞天数': 'likes_received_days', '获赞用户': 'likes_received_users'}
+            for m in re.finditer(bar_pattern, html, re.DOTALL):
+                label, status, nums_text = m.group(1).strip(), m.group(2), m.group(3).strip()
+                key = bar_map.get(label)
+                if key:
+                    parts = nums_text.split('/')
+                    current_text = parts[0].strip() if len(parts) >= 1 else '0'
+                    required_text = parts[1].strip() if len(parts) >= 2 else '0'
+                    current = self._parse_progress_value(current_text)
+                    required = self._parse_progress_value(required_text)
+                    progress[key] = {'current': current, 'required': required, 'completed': status == 'met', 'current_text': current_text, 'required_text': required_text}
 
-                    progress[key] = {
-                        'current': current,
-                        'required': required,
-                        'completed': completed,
-                        'current_text': current_text,
-                        'required_text': required_text,
-                    }
+            # 配额卡片（被举报帖子、举报用户）
+            quota_pattern = r'<div\s+class="tl3-quota-card\s+(met|unmet)"[^>]*>\s*<span\s+class="tl3-quota-label"[^>]*>(.*?)</span>\s*<span\s+class="tl3-quota-nums"[^>]*>(.*?)</span>'
+            quota_map = {'被举报帖子': 'flagged_posts', '举报用户': 'flagged_by_users'}
+            for m in re.finditer(quota_pattern, html, re.DOTALL):
+                status, label, nums_text = m.group(1), m.group(2).strip(), m.group(3).strip()
+                key = quota_map.get(label)
+                if key:
+                    parts = nums_text.split('/')
+                    current_text = parts[0].strip() if len(parts) >= 1 else '0'
+                    required_text = parts[1].strip() if len(parts) >= 2 else '0'
+                    current = self._parse_progress_value(current_text)
+                    required = self._parse_progress_value(required_text)
+                    progress[key] = {'current': current, 'required': required, 'completed': status == 'met', 'current_text': current_text, 'required_text': required_text}
+
+            # 否决项（被禁言、被封禁）— required 为 0，只取 front 面
+            veto_pattern = r'<div\s+class="tl3-veto-item\s+(met|unmet)"[^>]*>.*?<div\s+class="tl3-veto-face\s+tl3-veto-front"[^>]*>\s*<div\s+class="tl3-veto-label"[^>]*>(.*?)</div>\s*<span\s+class="tl3-veto-value"[^>]*>(.*?)</span>'
+            veto_map = {'被禁言': 'silenced', '被封禁': 'suspended'}
+            for m in re.finditer(veto_pattern, html, re.DOTALL):
+                status, label, value_text = m.group(1), m.group(2).strip(), m.group(3).strip()
+                key = veto_map.get(label)
+                if key:
+                    current = self._parse_progress_value(value_text)
+                    progress[key] = {'current': current, 'required': 0, 'completed': status == 'met', 'current_text': value_text, 'required_text': '0'}
 
         except Exception as e:
             print(f"[签到] 解析进度异常: {e}")
@@ -786,31 +766,5 @@ class Checkin:
         match = re.search(r'(\d+)', text)
         if match:
             return int(match.group(1))
-
-        return 0
-
-    def _parse_required_value(self, text: str, label: str) -> int:
-        """解析要求值"""
-        # 去除千分位逗号
-        text = text.replace(',', '')
-
-        # 格式1: 50% -> 对于访问次数，50% of 100天 = 50天（旧版）
-        if '%' in text:
-            match = re.search(r'(\d+)%', text)
-            if match:
-                percent = int(match.group(1))
-                if '访问' in label:
-                    return percent
-                return percent
-
-        # 格式2: 最多 5 个 -> 5
-        match = re.search(r'最多\s*(\d+)', text)
-        if match:
-            return int(match.group(1))
-
-        # 格式3: 50 天 / 20,000 等带单位的数字
-        match = re.search(r'([\d,]+)', text)
-        if match:
-            return int(match.group(1).replace(',', ''))
 
         return 0

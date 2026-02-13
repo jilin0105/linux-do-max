@@ -5,7 +5,8 @@ Linux.do 签到提醒脚本
 import requests
 from datetime import datetime
 import sys
-sys.path.insert(0, r'E:\linuxdo-checkin')
+import os
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from core.config import config
 
 
