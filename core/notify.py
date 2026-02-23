@@ -125,7 +125,7 @@ class Notifier:
                 ('likes_given', '点赞', '次'),
                 ('likes_received', '获赞', '次'),
                 ('likes_received_days', '获赞天数', '天'),
-                ('likes_received_users', '点赞用户数', '人'),
+                ('likes_received_users', '获赞用户', '人'),
                 ('silenced', '被禁言', '次'),
                 ('suspended', '被封禁', '次'),
             ]
