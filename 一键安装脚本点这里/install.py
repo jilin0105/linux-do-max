@@ -511,6 +511,7 @@ class ConfigManager:
         else:
             chrome_args_str = "  []"
 
+        # 使用单引号包裹路径，避免 Windows 路径中的反斜杠被 YAML 解析为转义序列
         content = f"""# ============================================================
 # LinuxDO 签到配置文件
 # 由一键安装脚本自动生成
@@ -518,13 +519,13 @@ class ConfigManager:
 # ============================================================
 
 # ========== 账号配置 ==========
-username: "{self.config['username']}"
-password: "{self.config['password']}"
+username: '{self.config['username']}'
+password: '{self.config['password']}'
 
 # ========== 浏览器配置 ==========
-user_data_dir: "{self.config['user_data_dir']}"
+user_data_dir: '{self.config['user_data_dir']}'
 headless: {str(self.config['headless']).lower()}
-browser_path: "{self.config['browser_path']}"
+browser_path: '{self.config['browser_path']}'
 
 # Chrome 额外启动参数
 # LXC/Docker 容器需要 --no-sandbox
@@ -539,8 +540,8 @@ browse_interval_min: {self.config['browse_interval_min']}
 browse_interval_max: {self.config['browse_interval_max']}
 
 # ========== Telegram 通知 ==========
-tg_bot_token: "{self.config['tg_bot_token']}"
-tg_chat_id: "{self.config['tg_chat_id']}"
+tg_bot_token: '{self.config['tg_bot_token']}'
+tg_chat_id: '{self.config['tg_chat_id']}'
 """
         with open(self.config_path, "w", encoding="utf-8") as f:
             f.write(content)
@@ -935,6 +936,10 @@ class CronManager:
             print_info("跳过定时任务配置")
             return
 
+        self._do_setup()
+
+    def _do_setup(self):
+
         if self.sys_info.os_type == "windows":
             self._setup_windows_task()
         elif self.sys_info.os_type == "macos":
@@ -1119,6 +1124,70 @@ class CronManager:
         print_success("Linux 定时任务已设置")
         print_info("查看任务: crontab -l | grep -i linuxdo")
 
+    def remove(self, silent: bool = False):
+        """删除定时任务
+
+        Args:
+            silent: 如果为 True，不提示确认，静默删除
+        """
+        if not silent:
+            print_step("删除定时任务...")
+
+        if self.sys_info.os_type == "windows":
+            self._remove_windows_task(silent)
+        elif self.sys_info.os_type == "macos":
+            self._remove_launchd(silent)
+        else:
+            self._remove_cron(silent)
+
+    def _remove_windows_task(self, silent: bool = False):
+        """删除 Windows 任务计划"""
+        import subprocess
+
+        # 删除任务
+        for i in range(1, 3):
+            task_name = f"LinuxDO-Checkin-{i}"
+            subprocess.run(
+                f'schtasks /delete /tn "{task_name}" /f',
+                shell=True,
+                capture_output=True
+            )
+
+        if not silent:
+            print_success("Windows 定时任务已删除")
+
+    def _remove_launchd(self, silent: bool = False):
+        """删除 macOS launchd 任务"""
+        plist_path = os.path.expanduser("~/Library/LaunchAgents/com.linuxdo.checkin.plist")
+
+        if os.path.exists(plist_path):
+            subprocess.run(["launchctl", "unload", plist_path], capture_output=True)
+            os.remove(plist_path)
+            if not silent:
+                print_success("macOS 定时任务已删除")
+        else:
+            if not silent:
+                print_info("未找到定时任务")
+
+    def _remove_cron(self, silent: bool = False):
+        """删除 Linux cron 任务"""
+        try:
+            result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+            existing_cron = result.stdout if result.returncode == 0 else ""
+        except:
+            existing_cron = ""
+
+        # 移除 LinuxDO 相关任务
+        lines = [l for l in existing_cron.split("\n") if "linuxdo" not in l.lower() and "LinuxDO" not in l]
+
+        # 写回 crontab
+        new_cron = "\n".join(lines) + "\n"
+        process = subprocess.Popen(["crontab", "-"], stdin=subprocess.PIPE, text=True)
+        process.communicate(input=new_cron)
+
+        if not silent:
+            print_success("Linux 定时任务已删除")
+
 
 # ============================================================
 # 主安装程序
@@ -1228,11 +1297,14 @@ class Installer:
             print("│  6. 首次登录                           │")
             print("│  7. 运行签到                           │")
             print("│  8. 查看系统信息                       │")
+            print("│  9. 检查更新                           │")
+            print("│  A. 卸载全部（保留登录信息）           │")
+            print("│  B. 删除定时任务                       │")
             print("│  0. 退出                               │")
             print("└────────────────────────────────────────┘")
             print()
 
-            choice = input("请选择 [0-8]: ").strip()
+            choice = input("请选择 [0-9,a-b]: ").strip().lower()
 
             if choice == "0":
                 print_info("退出")
@@ -1253,6 +1325,12 @@ class Installer:
                 self.run_checkin()
             elif choice == "8":
                 self.sys_info.print_info()
+            elif choice == "9":
+                self.manual_update()
+            elif choice == "a":
+                self.uninstall_keep_login()
+            elif choice == "b":
+                self.cron_manager.remove()
             else:
                 print_error("无效选项")
 
@@ -1545,6 +1623,71 @@ class Installer:
             return os.path.join(project_dir, "venv", "Scripts", "python.exe")
         else:
             return os.path.join(project_dir, "venv", "bin", "python")
+
+    def manual_update(self):
+        """手动检查更新"""
+        print_step("检查更新...")
+
+        python_path = self._get_venv_python()
+        main_script = os.path.join(self._get_project_dir(), "main.py")
+
+        if not os.path.exists(main_script):
+            print_error("找不到 main.py")
+            return
+
+        if python_path and os.path.exists(python_path):
+            subprocess.run([python_path, main_script, "--check-update"])
+        else:
+            print_error("未检测到 Python 环境，请先运行一键安装")
+
+    def uninstall_keep_login(self):
+        """卸载全部但保留登录信息"""
+        print()
+        print(f"{Colors.CYAN}╔════════════════════════════════════════════════════════════╗{Colors.NC}")
+        print(f"{Colors.CYAN}║{Colors.NC}          {Colors.YELLOW}卸载全部（保留登录信息）{Colors.NC}                     {Colors.CYAN}║{Colors.NC}")
+        print(f"{Colors.CYAN}╚════════════════════════════════════════════════════════════╝{Colors.NC}")
+        print()
+        print_info("即将卸载以下内容：")
+        print("  - Python 虚拟环境 (venv)")
+        print("  - 配置文件 (config.yaml)")
+        print("  - 定时任务")
+        print()
+        print_info("以下内容将保留：")
+        print("  - 登录信息 (.linuxdo-browser 目录)")
+        print()
+
+        choice = input("确认卸载？[y/N]: ").strip().lower()
+        if choice != 'y':
+            print_info("取消卸载")
+            return
+
+        print()
+        print_step("正在卸载...")
+
+        # 删除定时任务
+        print_info("删除定时任务...")
+        self.cron_manager.remove(silent=True)
+
+        # 删除虚拟环境
+        venv_dir = os.path.join(self._get_project_dir(), "venv")
+        if os.path.exists(venv_dir):
+            print_info("删除虚拟环境...")
+            import shutil
+            shutil.rmtree(venv_dir)
+
+        # 删除配置文件
+        config_path = os.path.join(self._get_project_dir(), "config.yaml")
+        if os.path.exists(config_path):
+            print_info("删除配置文件...")
+            os.remove(config_path)
+
+        print()
+        print_success("卸载完成！")
+        print()
+        print_info("登录信息已保留在 ~/.linuxdo-browser (或 %USERPROFILE%\.linuxdo-browser)")
+        print_info("如需完全删除登录信息，请手动删除该目录")
+        print()
+        input("按 Enter 继续...")
 
     def _print_completion(self):
         """打印完成信息"""

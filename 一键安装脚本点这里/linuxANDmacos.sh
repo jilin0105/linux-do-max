@@ -716,6 +716,103 @@ print_completion() {
     echo ""
 }
 
+# 卸载全部（保留登录信息）
+uninstall_keep_login() {
+    echo ""
+    echo "=========================================="
+    echo "        卸载全部（保留登录信息）"
+    echo "=========================================="
+    echo ""
+    print_info "即将卸载以下内容："
+    echo "  - Python 虚拟环境 (venv)"
+    echo "  - 配置文件 (config.yaml)"
+    echo "  - 定时任务"
+    echo ""
+    print_info "以下内容将保留："
+    echo "  - 登录信息 (~/.linuxdo-browser 目录)"
+    echo ""
+    read -p "确认卸载？[y/N]: " CONFIRM
+    [ "$CONFIRM" != "y" ] && [ "$CONFIRM" != "Y" ] && return
+
+    echo ""
+    print_info "正在卸载..."
+
+    # 删除定时任务
+    print_info "删除定时任务..."
+    if [ "$OS_NAME" = "macOS" ]; then
+        launchctl unload "$HOME/Library/LaunchAgents/com.linuxdo.checkin.plist" 2>/dev/null || true
+        rm -f "$HOME/Library/LaunchAgents/com.linuxdo.checkin.plist"
+    else
+        crontab -l 2>/dev/null | grep -v "linuxdo" | grep -v "LinuxDO" > /tmp/crontab.tmp || true
+        crontab /tmp/crontab.tmp 2>/dev/null || true
+        rm -f /tmp/crontab.tmp
+    fi
+
+    # 删除虚拟环境
+    if [ -d "venv" ]; then
+        print_info "删除虚拟环境..."
+        rm -rf venv
+    fi
+
+    # 删除配置文件
+    if [ -f "config.yaml" ]; then
+        print_info "删除配置文件..."
+        rm -f config.yaml
+    fi
+
+    print_success "卸载完成！"
+    echo ""
+    print_info "登录信息已保留在 ~/.linuxdo-browser"
+    print_info "如需完全删除登录信息，请手动删除该目录"
+    echo ""
+    read -p "按 Enter 继续..."
+}
+
+# 删除定时任务
+remove_cron() {
+    echo ""
+    echo "=========================================="
+    echo "              删除定时任务"
+    echo "=========================================="
+    echo ""
+
+    if [ "$OS_NAME" = "macOS" ]; then
+        PLIST="$HOME/Library/LaunchAgents/com.linuxdo.checkin.plist"
+        if [ -f "$PLIST" ]; then
+            print_info "当前定时任务："
+            launchctl list | grep "com.linuxdo.checkin" 2>/dev/null || echo "  无运行中的任务"
+            echo ""
+            read -p "确认删除定时任务？[y/N]: " CONFIRM
+            if [ "$CONFIRM" = "y" ] || [ "$CONFIRM" = "Y" ]; then
+                launchctl unload "$PLIST" 2>/dev/null || true
+                rm -f "$PLIST"
+                print_success "定时任务已删除"
+            fi
+        else
+            print_info "未找到定时任务"
+        fi
+    else
+        # Linux
+        CRON_JOBS=$(crontab -l 2>/dev/null | grep -i "linuxdo" || true)
+        if [ -n "$CRON_JOBS" ]; then
+            print_info "当前定时任务："
+            echo "$CRON_JOBS"
+            echo ""
+            read -p "确认删除所有 LinuxDO 定时任务？[y/N]: " CONFIRM
+            if [ "$CONFIRM" = "y" ] || [ "$CONFIRM" = "Y" ]; then
+                crontab -l 2>/dev/null | grep -v "linuxdo" | grep -v "LinuxDO" > /tmp/crontab.tmp || true
+                crontab /tmp/crontab.tmp 2>/dev/null || true
+                rm -f /tmp/crontab.tmp
+                print_success "定时任务已删除"
+            fi
+        else
+            print_info "未找到定时任务"
+        fi
+    fi
+    echo ""
+    read -p "按 Enter 继续..."
+}
+
 # 主菜单
 main_menu() {
     while true; do
@@ -732,10 +829,12 @@ main_menu() {
         echo "│  7. 运行签到                        │"
         echo "│  8. 查看系统信息                    │"
         echo "│  9. 检查更新                        │"
+        echo "│  A. 卸载全部（保留登录信息）        │"
+        echo "│  B. 删除定时任务                    │"
         echo "│  0. 退出                            │"
         echo "└─────────────────────────────────────┘"
         echo ""
-        read -p "请选择 [0-9]: " choice
+        read -p "请选择 [0-9,a-b]: " choice
 
         case $choice in
             0) exit 0 ;;
@@ -748,6 +847,8 @@ main_menu() {
             7) run_checkin ;;
             8) detect_system ;;
             9) manual_update ;;
+            [aA]) uninstall_keep_login ;;
+            [bB]) remove_cron ;;
             *) print_error "无效选项" ;;
         esac
     done

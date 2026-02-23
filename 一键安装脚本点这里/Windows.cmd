@@ -135,6 +135,8 @@ echo ^|  4. 设置定时任务                           ^|
 echo ^|  5. 首次登录                               ^|
 echo ^|  6. 运行签到                               ^|
 echo ^|  7. 检查更新                               ^|
+echo ^|  8. 卸载全部（保留登录信息）               ^|
+echo ^|  9. 删除定时任务                           ^|
 echo ^|  0. 退出                                   ^|
 echo +--------------------------------------------+
 echo.
@@ -149,6 +151,8 @@ if "%choice%"=="4" goto :setup_task
 if "%choice%"=="5" goto :first_login
 if "%choice%"=="6" goto :run_checkin
 if "%choice%"=="7" goto :manual_update
+if "%choice%"=="8" goto :uninstall_keep_login
+if "%choice%"=="9" goto :remove_task
 echo [错误] 无效选项
 goto :menu
 
@@ -437,6 +441,74 @@ echo   3. 编辑配置: 选择菜单 3 或直接编辑 config.yaml
 echo   4. 查看任务: schtasks /query /tn LinuxDO-Checkin-1
 echo.
 goto :eof
+
+:uninstall_keep_login
+echo.
+echo ============================================================
+echo              卸载全部（保留登录信息）
+echo ============================================================
+echo.
+echo [信息] 即将卸载以下内容：
+echo   - Python 虚拟环境 (venv)
+echo   - 配置文件 (config.yaml)
+echo   - 定时任务
+echo.
+echo [信息] 以下内容将保留：
+echo   - 登录信息 (.linuxdo-browser 目录)
+echo.
+set "confirm_uninstall="
+set /p confirm_uninstall="确认卸载？[y/N]: "
+if /i not "!confirm_uninstall!"=="y" goto :menu
+
+echo.
+echo [信息] 正在卸载...
+
+REM 删除定时任务
+echo [信息] 删除定时任务...
+schtasks /delete /tn "LinuxDO-Checkin-1" /f >nul 2>&1
+schtasks /delete /tn "LinuxDO-Checkin-2" /f >nul 2>&1
+
+REM 删除虚拟环境
+if exist "venv" (
+    echo [信息] 删除虚拟环境...
+    rmdir /s /q "venv"
+)
+
+REM 删除配置文件
+if exist "config.yaml" (
+    echo [信息] 删除配置文件...
+    del /f config.yaml
+)
+
+echo.
+echo [成功] 卸载完成！
+echo.
+echo [提示] 登录信息已保留在 %%USERPROFILE%%\.linuxdo-browser
+echo [提示] 如需完全删除登录信息，请手动删除该目录
+echo.
+pause
+goto :menu
+
+:remove_task
+echo.
+echo ============================================================
+echo                   删除定时任务
+echo ============================================================
+echo.
+echo [信息] 当前定时任务：
+schtasks /query /tn "LinuxDO-Checkin-*" 2>nul || echo   无定时任务
+echo.
+set "confirm_remove="
+set /p confirm_remove="确认删除所有 LinuxDO 定时任务？[y/N]: "
+if /i not "!confirm_remove!"=="y" goto :menu
+
+echo [信息] 删除定时任务...
+schtasks /delete /tn "LinuxDO-Checkin-1" /f >nul 2>&1
+schtasks /delete /tn "LinuxDO-Checkin-2" /f >nul 2>&1
+echo [成功] 定时任务已删除
+echo.
+pause
+goto :menu
 
 :exit_script
 echo.
