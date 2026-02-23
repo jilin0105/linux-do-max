@@ -1,0 +1,1606 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+LinuxDO 签到 - 一键安装脚本
+支持: Windows / Linux / macOS / ARM
+
+功能:
+- 自动检测系统平台
+- 自动安装依赖
+- 交互式配置
+- 设置定时任务
+- 首次登录引导
+
+使用方法:
+    python setup.py
+"""
+
+import os
+import sys
+import platform
+import subprocess
+import shutil
+import json
+import re
+from pathlib import Path
+from typing import Optional, Dict, Any
+
+# Windows 控制台编码设置
+if sys.platform == "win32":
+    # 设置控制台代码页为 UTF-8
+    os.system("chcp 65001 >nul 2>&1")
+    # 设置标准输出编码
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+
+# ============================================================
+# 版本信息
+# ============================================================
+VERSION = "1.4.0"
+SCRIPT_NAME = "LinuxDO 签到一键安装脚本"
+
+# ============================================================
+# 颜色输出
+# ============================================================
+class Colors:
+    """终端颜色"""
+    if sys.platform == "win32":
+        # Windows 启用 ANSI 颜色
+        os.system("")
+
+    RED = "\033[0;31m"
+    GREEN = "\033[0;32m"
+    YELLOW = "\033[1;33m"
+    BLUE = "\033[0;34m"
+    PURPLE = "\033[0;35m"
+    CYAN = "\033[0;36m"
+    NC = "\033[0m"  # No Color
+
+def print_banner():
+    """打印横幅"""
+    print()
+    print(f"{Colors.CYAN}╔════════════════════════════════════════════════════════════╗{Colors.NC}")
+    print(f"{Colors.CYAN}║{Colors.NC}        {Colors.GREEN}{SCRIPT_NAME} v{VERSION}{Colors.NC}        {Colors.CYAN}║{Colors.NC}")
+    print(f"{Colors.CYAN}╚════════════════════════════════════════════════════════════╝{Colors.NC}")
+    print()
+
+def print_info(msg: str):
+    print(f"{Colors.BLUE}[信息]{Colors.NC} {msg}")
+
+def print_success(msg: str):
+    print(f"{Colors.GREEN}[成功]{Colors.NC} {msg}")
+
+def print_warning(msg: str):
+    print(f"{Colors.YELLOW}[警告]{Colors.NC} {msg}")
+
+def print_error(msg: str):
+    print(f"{Colors.RED}[错误]{Colors.NC} {msg}")
+
+def print_step(msg: str):
+    print(f"{Colors.PURPLE}[步骤]{Colors.NC} {msg}")
+
+# ============================================================
+# 系统检测
+# ============================================================
+class SystemInfo:
+    """系统信息检测"""
+
+    def __init__(self):
+        self.os_type: str = ""  # windows, linux, macos
+        self.os_name: str = ""
+        self.os_version: str = ""
+        self.arch: str = ""  # x64, arm64, arm32
+        self.arch_raw: str = ""
+        self.distro: str = ""  # debian, ubuntu, centos, fedora, arch, alpine
+        self.distro_name: str = ""
+        self.pkg_manager: str = ""  # apt, dnf, yum, pacman, apk, brew
+        self.is_arm: bool = False
+        self.is_raspberry_pi: bool = False
+        self.is_docker: bool = False
+        self.is_lxc: bool = False
+        self.is_container: bool = False
+        self.has_display: bool = False
+        self.python_path: str = sys.executable
+        self.browser_path: str = ""
+        self.home_dir: str = str(Path.home())
+        self.script_dir: str = str(Path(__file__).parent.absolute())
+
+        self._detect()
+
+    def _detect(self):
+        """检测系统信息"""
+        # 操作系统
+        system = platform.system().lower()
+        if system == "windows":
+            self.os_type = "windows"
+            self.os_name = "Windows"
+            self.os_version = platform.version()
+        elif system == "darwin":
+            self.os_type = "macos"
+            self.os_name = "macOS"
+            self.os_version = platform.mac_ver()[0]
+        elif system == "linux":
+            self.os_type = "linux"
+            self.os_name = "Linux"
+            self._detect_linux_distro()
+        else:
+            self.os_type = "unknown"
+            self.os_name = system
+
+        # 架构
+        self.arch_raw = platform.machine().lower()
+        if self.arch_raw in ("x86_64", "amd64"):
+            self.arch = "x64"
+        elif self.arch_raw in ("aarch64", "arm64"):
+            self.arch = "arm64"
+            self.is_arm = True
+        elif self.arch_raw.startswith("arm"):
+            self.arch = "arm32"
+            self.is_arm = True
+        else:
+            self.arch = self.arch_raw
+
+        # 树莓派检测
+        if self.os_type == "linux":
+            self._detect_raspberry_pi()
+
+        # Docker 检测
+        self._detect_docker()
+
+        # 图形界面检测
+        self._detect_display()
+
+        # 浏览器检测
+        self._detect_browser()
+
+    def _detect_linux_distro(self):
+        """检测 Linux 发行版"""
+        try:
+            if os.path.exists("/etc/os-release"):
+                with open("/etc/os-release") as f:
+                    content = f.read()
+                    for line in content.split("\n"):
+                        if line.startswith("ID="):
+                            self.distro = line.split("=")[1].strip('"').lower()
+                        elif line.startswith("PRETTY_NAME="):
+                            self.distro_name = line.split("=")[1].strip('"')
+                        elif line.startswith("VERSION_ID="):
+                            self.os_version = line.split("=")[1].strip('"')
+        except:
+            pass
+
+        # 包管理器检测
+        if shutil.which("apt-get"):
+            self.pkg_manager = "apt"
+        elif shutil.which("dnf"):
+            self.pkg_manager = "dnf"
+        elif shutil.which("yum"):
+            self.pkg_manager = "yum"
+        elif shutil.which("pacman"):
+            self.pkg_manager = "pacman"
+        elif shutil.which("apk"):
+            self.pkg_manager = "apk"
+        elif shutil.which("zypper"):
+            self.pkg_manager = "zypper"
+
+    def _detect_raspberry_pi(self):
+        """检测是否为树莓派"""
+        try:
+            if os.path.exists("/proc/device-tree/model"):
+                with open("/proc/device-tree/model") as f:
+                    model = f.read()
+                    if "Raspberry Pi" in model:
+                        self.is_raspberry_pi = True
+        except:
+            pass
+
+    def _detect_docker(self):
+        """检测是否在 Docker/LXC 容器中"""
+        # Docker 检测
+        if os.path.exists("/.dockerenv"):
+            self.is_docker = True
+            self.is_container = True
+        elif os.path.exists("/proc/1/cgroup"):
+            try:
+                with open("/proc/1/cgroup") as f:
+                    content = f.read()
+                    if "docker" in content:
+                        self.is_docker = True
+                        self.is_container = True
+                    elif "lxc" in content:
+                        self.is_lxc = True
+                        self.is_container = True
+            except:
+                pass
+
+        # LXC 检测（额外方法）
+        if not self.is_container:
+            # 检查 /run/.containerenv (Podman)
+            if os.path.exists("/run/.containerenv"):
+                self.is_container = True
+            # 使用 systemd-detect-virt 检测
+            try:
+                result = subprocess.run(
+                    ["systemd-detect-virt", "-c"],
+                    capture_output=True,
+                    text=True
+                )
+                if result.returncode == 0:
+                    virt_type = result.stdout.strip().lower()
+                    if virt_type in ("lxc", "lxc-libvirt", "docker", "podman", "openvz"):
+                        self.is_container = True
+                        if "lxc" in virt_type:
+                            self.is_lxc = True
+            except:
+                pass
+
+    def _detect_display(self):
+        """检测是否有图形界面"""
+        if self.os_type == "windows":
+            self.has_display = True
+        elif self.os_type == "macos":
+            self.has_display = True
+        else:
+            self.has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+    def _detect_browser(self):
+        """检测浏览器路径（只检测 Google Chrome，不检测 Snap Chromium）"""
+        browser_paths = []
+
+        if self.os_type == "windows":
+            browser_paths = [
+                os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+                os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
+                os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
+            ]
+        elif self.os_type == "macos":
+            browser_paths = [
+                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            ]
+        else:  # Linux - 只检测 Google Chrome
+            browser_paths = [
+                "/usr/bin/google-chrome",
+                "/usr/bin/google-chrome-stable",
+            ]
+
+        for path in browser_paths:
+            if os.path.exists(path) and os.access(path, os.X_OK):
+                self.browser_path = path
+                break
+
+        # 如果没找到，尝试 which 命令（仅 Linux/macOS，只找 google-chrome）
+        if not self.browser_path and self.os_type != "windows":
+            for cmd in ["google-chrome", "google-chrome-stable"]:
+                try:
+                    result = subprocess.run(
+                        ["which", cmd],
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    if result.returncode == 0:
+                        path = result.stdout.strip()
+                        if path and os.path.exists(path):
+                            self.browser_path = path
+                            break
+                except:
+                    pass
+
+        # ARM 设备：允许使用 apt 安装的 chromium（非 Snap）
+        if not self.browser_path and self.is_arm and self.os_type == "linux":
+            for path in ["/usr/bin/chromium-browser", "/usr/bin/chromium"]:
+                if os.path.exists(path) and os.access(path, os.X_OK):
+                    # 检查是否是 Snap 符号链接
+                    try:
+                        real_path = os.path.realpath(path)
+                        if "snap" not in real_path:
+                            self.browser_path = path
+                            break
+                    except:
+                        pass
+
+    def get_browser_version(self) -> str:
+        """获取浏览器版本"""
+        if not self.browser_path:
+            return ""
+        try:
+            result = subprocess.run(
+                [self.browser_path, "--version"],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            if result.returncode == 0:
+                return result.stdout.strip().split('\n')[0]
+        except:
+            pass
+        return ""
+
+    def test_browser_launch(self) -> bool:
+        """测试浏览器是否能正常启动（打开可见窗口）"""
+        if not self.browser_path:
+            return False
+
+        try:
+            # 直接打开 Google 首页测试
+            test_url = "https://www.google.com"
+
+            # 启动参数（有界面模式）
+            launch_args = [
+                self.browser_path,
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                test_url
+            ]
+
+            # 启动浏览器（非阻塞）
+            process = subprocess.Popen(
+                launch_args,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+
+            print_info(f"浏览器已启动 (PID: {process.pid})")
+            print_info("如果看到 Google 搜索页面，说明浏览器正常工作")
+            print()
+
+            # 等待用户确认
+            choice = input("浏览器是否正常显示？[Y/n]: ").strip().lower()
+
+            # 关闭测试浏览器
+            try:
+                process.terminate()
+                process.wait(timeout=5)
+            except:
+                process.kill()
+
+            return choice != 'n'
+
+        except Exception as e:
+            print_error(f"启动浏览器失败: {e}")
+            return False
+
+    def print_info(self):
+        """打印系统信息（简洁格式，避免中文宽度问题）"""
+        print()
+        print("=" * 42)
+        print("          系统环境检测结果")
+        print("=" * 42)
+
+        items = [
+            ("操作系统", self.os_name),
+            ("版本", (self.os_version[:24] if self.os_version else "未知")),
+            ("架构", f"{self.arch_raw} ({self.arch})"),
+        ]
+        if self.os_type == "linux":
+            items.append(("发行版", self.distro or "未知"))
+            items.append(("包管理器", self.pkg_manager or "未知"))
+        items.extend([
+            ("ARM设备", "是" if self.is_arm else "否"),
+            ("树莓派", "是" if self.is_raspberry_pi else "否"),
+            ("容器环境", "是" if self.is_container else "否"),
+        ])
+        if self.is_container:
+            container_type = "Docker" if self.is_docker else ("LXC" if self.is_lxc else "其他")
+            items.append(("容器类型", container_type))
+        items.extend([
+            ("图形界面", "有" if self.has_display else "无"),
+            ("浏览器", "已安装" if self.browser_path else "未安装"),
+        ])
+
+        for label, value in items:
+            print(f"  {label}: {value}")
+
+        print("=" * 42)
+        print()
+
+
+# ============================================================
+# 配置管理
+# ============================================================
+class ConfigManager:
+    """配置文件管理"""
+
+    DEFAULT_CONFIG = {
+        "username": "",
+        "password": "",
+        "user_data_dir": "",
+        "headless": False,
+        "browser_path": "",
+        "chrome_args": [],
+        "browse_count": 10,
+        "like_probability": 0.3,
+        "browse_interval_min": 15,
+        "browse_interval_max": 30,
+        "tg_bot_token": "",
+        "tg_chat_id": "",
+    }
+
+    ENV_MAPPING = {
+        "LINUXDO_USERNAME": "username",
+        "LINUXDO_PASSWORD": "password",
+        "USER_DATA_DIR": "user_data_dir",
+        "HEADLESS": "headless",
+        "BROWSER_PATH": "browser_path",
+        "CHROME_ARGS": "chrome_args",
+        "BROWSE_COUNT": "browse_count",
+        "LIKE_PROBABILITY": "like_probability",
+        "BROWSE_INTERVAL_MIN": "browse_interval_min",
+        "BROWSE_INTERVAL_MAX": "browse_interval_max",
+        "TG_BOT_TOKEN": "tg_bot_token",
+        "TG_CHAT_ID": "tg_chat_id",
+    }
+
+    def __init__(self, config_path: str = "config.yaml"):
+        self.config_path = config_path
+        self.config: Dict[str, Any] = self.DEFAULT_CONFIG.copy()
+        self._load()
+
+    def _load(self):
+        """加载配置文件"""
+        # 检查 config.yaml 是否被错误创建为目录
+        if os.path.isdir(self.config_path):
+            print_warning(f"config.yaml 是一个目录而不是文件，正在自动修复...")
+            try:
+                import shutil as _shutil
+                _shutil.rmtree(self.config_path)
+                print_success("已删除错误的 config.yaml 目录")
+            except Exception as e:
+                print_error(f"删除 config.yaml 目录失败: {e}")
+                print_info("请手动删除后重试: rm -rf config.yaml")
+            return
+
+        if os.path.exists(self.config_path) and os.path.isfile(self.config_path):
+            try:
+                import yaml
+                with open(self.config_path, "r", encoding="utf-8") as f:
+                    loaded = yaml.safe_load(f) or {}
+                    self.config.update(loaded)
+            except ImportError:
+                # 如果没有 yaml 模块，尝试简单解析
+                self._load_simple()
+            except Exception as e:
+                print_warning(f"加载配置文件失败: {e}")
+
+    def _load_simple(self):
+        """简单解析 YAML（不依赖 PyYAML）"""
+        try:
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith("#") and ":" in line:
+                        key, value = line.split(":", 1)
+                        key = key.strip()
+                        value = value.strip().strip('"').strip("'")
+                        if key in self.config:
+                            # 类型转换
+                            if isinstance(self.DEFAULT_CONFIG.get(key), bool):
+                                value = value.lower() in ("true", "1", "yes")
+                            elif isinstance(self.DEFAULT_CONFIG.get(key), int):
+                                value = int(value) if value else 0
+                            elif isinstance(self.DEFAULT_CONFIG.get(key), float):
+                                value = float(value) if value else 0.0
+                            self.config[key] = value
+        except Exception as e:
+            print_warning(f"简单解析配置失败: {e}")
+
+    def save(self):
+        """保存配置文件"""
+        # 检查 config.yaml 是否被错误创建为目录
+        if os.path.isdir(self.config_path):
+            print_warning(f"config.yaml 是一个目录而不是文件，正在自动修复...")
+            try:
+                import shutil as _shutil
+                _shutil.rmtree(self.config_path)
+                print_success("已删除错误的 config.yaml 目录")
+            except Exception as e:
+                print_error(f"删除 config.yaml 目录失败: {e}")
+                return
+
+        # 确保父目录存在
+        parent_dir = os.path.dirname(os.path.abspath(self.config_path))
+        if parent_dir:
+            os.makedirs(parent_dir, exist_ok=True)
+
+        # 处理 chrome_args
+        chrome_args = self.config.get('chrome_args', [])
+        if isinstance(chrome_args, list) and chrome_args:
+            chrome_args_str = "\n".join([f'  - "{arg}"' for arg in chrome_args])
+        else:
+            chrome_args_str = "  []"
+
+        content = f"""# ============================================================
+# LinuxDO 签到配置文件
+# 由一键安装脚本自动生成
+# 环境变量优先级高于此配置文件
+# ============================================================
+
+# ========== 账号配置 ==========
+username: "{self.config['username']}"
+password: "{self.config['password']}"
+
+# ========== 浏览器配置 ==========
+user_data_dir: "{self.config['user_data_dir']}"
+headless: {str(self.config['headless']).lower()}
+browser_path: "{self.config['browser_path']}"
+
+# Chrome 额外启动参数
+# LXC/Docker 容器需要 --no-sandbox
+# 无界面服务器可添加 --headless=new, --disable-gpu
+chrome_args:
+{chrome_args_str}
+
+# ========== 签到配置 ==========
+browse_count: {self.config['browse_count']}
+like_probability: {self.config['like_probability']}
+browse_interval_min: {self.config['browse_interval_min']}
+browse_interval_max: {self.config['browse_interval_max']}
+
+# ========== Telegram 通知 ==========
+tg_bot_token: "{self.config['tg_bot_token']}"
+tg_chat_id: "{self.config['tg_chat_id']}"
+"""
+        with open(self.config_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        print_success(f"配置已保存: {self.config_path}")
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """获取配置（环境变量优先）"""
+        # 检查环境变量
+        for env_key, config_key in self.ENV_MAPPING.items():
+            if config_key == key:
+                env_value = os.environ.get(env_key)
+                if env_value:
+                    # 类型转换
+                    if isinstance(self.DEFAULT_CONFIG.get(key), bool):
+                        return env_value.lower() in ("true", "1", "yes")
+                    elif isinstance(self.DEFAULT_CONFIG.get(key), int):
+                        return int(env_value)
+                    elif isinstance(self.DEFAULT_CONFIG.get(key), float):
+                        return float(env_value)
+                    return env_value
+        return self.config.get(key, default)
+
+    def set(self, key: str, value: Any):
+        """设置配置"""
+        self.config[key] = value
+
+    def interactive_edit(self):
+        """交互式编辑配置"""
+        print()
+        print("=" * 42)
+        print("            配置编辑菜单")
+        print("=" * 42)
+        print()
+
+        while True:
+            print("当前配置:")
+            print(f"  1. 用户名: {self.config['username'] or '(未设置)'}")
+            print(f"  2. 密码: {'*' * len(self.config['password']) if self.config['password'] else '(未设置)'}")
+            print(f"  3. 用户数据目录: {self.config['user_data_dir'] or '(默认)'}")
+            print(f"  4. 无头模式: {self.config['headless']}")
+            print(f"  5. 浏览器路径: {self.config['browser_path'] or '(自动检测)'}")
+            print(f"  6. 浏览帖子数: {self.config['browse_count']}")
+            print(f"  7. 点赞概率: {self.config['like_probability']}")
+            print(f"  8. Telegram Token: {self.config['tg_bot_token'][:20] + '...' if self.config['tg_bot_token'] else '(未设置)'}")
+            print(f"  9. Telegram Chat ID: {self.config['tg_chat_id'] or '(未设置)'}")
+            print()
+            print("  0. 保存并返回")
+            print("  q. 不保存返回")
+            print()
+
+            choice = input("请选择要修改的项 [0-9/q]: ").strip()
+
+            if choice == "0":
+                self.save()
+                break
+            elif choice == "q":
+                print_info("取消修改")
+                break
+            elif choice == "1":
+                self.config["username"] = input("用户名: ").strip()
+            elif choice == "2":
+                self.config["password"] = input("密码: ").strip()
+            elif choice == "3":
+                self.config["user_data_dir"] = input("用户数据目录: ").strip()
+            elif choice == "4":
+                val = input("无头模式 (true/false): ").strip().lower()
+                self.config["headless"] = val in ("true", "1", "yes")
+            elif choice == "5":
+                self.config["browser_path"] = input("浏览器路径: ").strip()
+            elif choice == "6":
+                try:
+                    self.config["browse_count"] = int(input("浏览帖子数: ").strip())
+                except:
+                    print_error("请输入数字")
+            elif choice == "7":
+                try:
+                    self.config["like_probability"] = float(input("点赞概率 (0-1): ").strip())
+                except:
+                    print_error("请输入数字")
+            elif choice == "8":
+                self.config["tg_bot_token"] = input("Telegram Bot Token: ").strip()
+            elif choice == "9":
+                self.config["tg_chat_id"] = input("Telegram Chat ID: ").strip()
+
+            print()
+
+
+# ============================================================
+# 依赖安装器
+# ============================================================
+class DependencyInstaller:
+    """依赖安装器"""
+
+    def __init__(self, sys_info: SystemInfo):
+        self.sys_info = sys_info
+
+    def install_all(self):
+        """安装所有依赖"""
+        print_step("安装系统依赖...")
+
+        if self.sys_info.os_type == "linux":
+            self._install_linux_deps()
+        elif self.sys_info.os_type == "macos":
+            self._install_macos_deps()
+        elif self.sys_info.os_type == "windows":
+            self._check_windows_deps()
+
+        print_success("系统依赖安装完成")
+
+    def _verify_browser_install(self) -> bool:
+        """验证浏览器安装"""
+        print_info("验证浏览器安装...")
+
+        if not self.sys_info.browser_path:
+            print_error("未检测到浏览器！")
+            return False
+
+        print_success(f"检测到浏览器: {self.sys_info.browser_path}")
+
+        # 获取版本号
+        version = self.sys_info.get_browser_version()
+        if version:
+            print_info(f"浏览器版本: {version}")
+
+        return True
+
+    def _test_browser_launch(self) -> bool:
+        """测试浏览器启动"""
+        print_info("测试浏览器启动...")
+
+        if not self.sys_info.browser_path:
+            print_error("未检测到浏览器，无法测试")
+            return False
+
+        print_info("启动浏览器进行测试...")
+
+        if self.sys_info.test_browser_launch():
+            print_success("浏览器启动测试通过！")
+            return True
+        else:
+            print_warning("浏览器启动测试未能确认，但可能仍然可用")
+            return True
+
+    def _install_linux_deps(self):
+        """安装 Linux 依赖"""
+        pkg_manager = self.sys_info.pkg_manager
+
+        if pkg_manager == "apt":
+            # 基础包（不含浏览器）
+            base_packages = [
+                # Python 环境
+                "python3", "python3-pip", "python3-venv", "python3-dev",
+                # 虚拟显示
+                "xvfb",
+                # 中文字体
+                "fonts-wqy-zenhei", "fonts-wqy-microhei",
+                # Chromium 依赖库
+                "libatk1.0-0", "libatk-bridge2.0-0", "libcups2",
+                "libdrm2", "libxkbcommon0", "libxcomposite1",
+                "libxdamage1", "libxfixes3", "libxrandr2",
+                "libgbm1", "libasound2",
+                # 下载工具
+                "wget", "curl", "gnupg"
+            ]
+            print_info("使用 apt 安装依赖...")
+            self._run_cmd("sudo apt-get update")
+            for pkg in base_packages:
+                self._run_cmd(f"sudo apt-get install -y {pkg}", ignore_error=True)
+
+            # 安装 Google Chrome（通过官方 apt 源，不使用 Snap）
+            has_chrome = (
+                shutil.which("google-chrome") or
+                shutil.which("google-chrome-stable")
+            )
+
+            if has_chrome:
+                # 检查是否是 Snap 版本
+                chrome_path = shutil.which("google-chrome") or shutil.which("google-chrome-stable")
+                real_path = os.path.realpath(chrome_path) if chrome_path else ""
+                if "snap" in real_path:
+                    print_warning("检测到 Snap 版 Chrome，需要安装官方版本...")
+                    has_chrome = False
+                else:
+                    print_info("检测到 Google Chrome，跳过安装")
+
+            if not has_chrome:
+                print_info("安装 Google Chrome（通过官方 apt 源）...")
+
+                # 检查架构
+                if self.sys_info.is_arm:
+                    print_error("ARM64 架构暂不支持 Google Chrome")
+                    print_info("请使用 x64 架构的系统，或在其他电脑完成首次登录后复制登录状态")
+                else:
+                    # 添加 Google 官方 apt 源
+                    print_info("添加 Google Chrome 官方源...")
+
+                    # 添加 Google 签名密钥
+                    self._run_cmd(
+                        "wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg",
+                        ignore_error=True
+                    )
+
+                    # 添加 apt 源
+                    self._run_cmd(
+                        'echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list > /dev/null',
+                        ignore_error=True
+                    )
+
+                    # 更新并安装
+                    self._run_cmd("sudo apt-get update", ignore_error=True)
+                    self._run_cmd("sudo apt-get install -y google-chrome-stable", ignore_error=True)
+
+                    # 验证安装
+                    if shutil.which("google-chrome") or shutil.which("google-chrome-stable"):
+                        print_success("Google Chrome 安装成功")
+                    else:
+                        print_error("Google Chrome 安装失败！")
+                        print_info("请手动安装：")
+                        print_info("  wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb")
+                        print_info("  sudo dpkg -i google-chrome-stable_current_amd64.deb")
+                        print_info("  sudo apt-get install -f -y")
+
+            # 刷新字体缓存
+            self._run_cmd("fc-cache -fv", ignore_error=True)
+
+        elif pkg_manager == "dnf":
+            print_info("使用 dnf 安装依赖...")
+            self._run_cmd("sudo dnf install -y python3 python3-pip python3-virtualenv python3-devel", ignore_error=True)
+            # Fedora/RHEL: 安装 Google Chrome
+            if not shutil.which("google-chrome"):
+                print_info("安装 Google Chrome...")
+                self._run_cmd("sudo dnf install -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm", ignore_error=True)
+            self._run_cmd("sudo dnf install -y xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts", ignore_error=True)
+            self._run_cmd("fc-cache -fv", ignore_error=True)
+
+        elif pkg_manager == "yum":
+            print_info("使用 yum 安装依赖...")
+            self._run_cmd("sudo yum install -y python3 python3-pip python3-virtualenv python3-devel", ignore_error=True)
+            # CentOS/RHEL: 安装 Google Chrome
+            if not shutil.which("google-chrome"):
+                print_info("安装 Google Chrome...")
+                self._run_cmd("sudo yum install -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm", ignore_error=True)
+            self._run_cmd("sudo yum install -y xorg-x11-server-Xvfb wqy-zenhei-fonts wqy-microhei-fonts", ignore_error=True)
+            self._run_cmd("fc-cache -fv", ignore_error=True)
+
+        elif pkg_manager == "pacman":
+            print_info("使用 pacman 安装依赖...")
+            self._run_cmd("sudo pacman -Syu --noconfirm python python-pip python-virtualenv", ignore_error=True)
+            # Arch: google-chrome 在 AUR，使用 chromium
+            self._run_cmd("sudo pacman -Syu --noconfirm chromium xorg-server-xvfb wqy-zenhei wqy-microhei", ignore_error=True)
+            self._run_cmd("fc-cache -fv", ignore_error=True)
+
+        elif pkg_manager == "apk":
+            print_info("使用 apk 安装依赖...")
+            # Alpine: python3-dev 包含 venv 模块
+            self._run_cmd("sudo apk add python3 py3-pip python3-dev", ignore_error=True)
+            self._run_cmd("sudo apk add chromium chromium-chromedriver xvfb font-wqy-zenhei ttf-wqy-zenhei font-noto-cjk", ignore_error=True)
+            self._run_cmd("fc-cache -fv", ignore_error=True)
+
+        elif pkg_manager == "zypper":
+            print_info("使用 zypper 安装依赖...")
+            self._run_cmd("sudo zypper install -y python3 python3-pip python3-virtualenv python3-devel", ignore_error=True)
+            # openSUSE: 安装 Google Chrome
+            if not shutil.which("google-chrome"):
+                print_info("安装 Google Chrome...")
+                self._run_cmd("sudo zypper install -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm", ignore_error=True)
+            self._run_cmd("sudo zypper install -y xvfb-run google-noto-sans-cjk-fonts", ignore_error=True)
+            self._run_cmd("fc-cache -fv", ignore_error=True)
+
+        else:
+            print_warning(f"未知包管理器: {pkg_manager}")
+            print_info("请手动安装: Python3, pip, venv, Google Chrome, Xvfb, 中文字体")
+
+    def _install_macos_deps(self):
+        """安装 macOS 依赖"""
+        # 检查 Homebrew
+        if not shutil.which("brew"):
+            print_info("安装 Homebrew...")
+            self._run_cmd('/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"')
+
+        # 安装 Python
+        print_info("安装 Python...")
+        self._run_cmd("brew install python3", ignore_error=True)
+
+        # 检查并安装 Chrome
+        if not os.path.exists("/Applications/Google Chrome.app"):
+            print_info("安装 Google Chrome...")
+            result = self._run_cmd("brew install --cask google-chrome", ignore_error=True)
+            if result != 0:
+                print_warning("自动安装 Chrome 失败")
+                print_info("请从 https://www.google.com/chrome/ 下载安装")
+        else:
+            print_info("检测到 Google Chrome，跳过安装")
+
+    def _check_windows_deps(self):
+        """检查 Windows 依赖"""
+        if not self.sys_info.browser_path:
+            print_warning("未检测到 Chrome")
+            print_info("请从 https://www.google.com/chrome/ 下载安装")
+
+    def _run_cmd(self, cmd: str, ignore_error: bool = False) -> bool:
+        """运行命令"""
+        try:
+            result = subprocess.run(
+                cmd,
+                shell=True,
+                capture_output=True,
+                text=True
+            )
+            return result.returncode == 0
+        except Exception as e:
+            if not ignore_error:
+                print_error(f"命令执行失败: {e}")
+            return False
+
+    def setup_python_env(self, project_dir: str = None):
+        """配置 Python 环境"""
+        print_step("配置 Python 环境...")
+
+        # venv 应该在项目根目录，不是脚本目录
+        if project_dir is None:
+            project_dir = os.getcwd()
+
+        # 确保在项目根目录（有 main.py 的目录）
+        if not os.path.exists(os.path.join(project_dir, "main.py")):
+            # 尝试找到项目根目录
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            parent_dir = os.path.dirname(script_dir)
+            if os.path.exists(os.path.join(parent_dir, "main.py")):
+                project_dir = parent_dir
+                print_info(f"项目目录: {project_dir}")
+
+        venv_dir = os.path.join(project_dir, "venv")
+
+        # 创建虚拟环境
+        if not os.path.exists(venv_dir):
+            print_info("创建虚拟环境...")
+            result = subprocess.run([sys.executable, "-m", "venv", "venv"], cwd=project_dir)
+            if result.returncode != 0:
+                print_error("创建虚拟环境失败，尝试使用 virtualenv...")
+                # 尝试使用 virtualenv
+                subprocess.run([sys.executable, "-m", "pip", "install", "virtualenv"], capture_output=True)
+                subprocess.run([sys.executable, "-m", "virtualenv", "venv"], cwd=project_dir)
+
+        # 获取 pip 路径
+        if self.sys_info.os_type == "windows":
+            pip_path = os.path.join(venv_dir, "Scripts", "pip.exe")
+            python_path = os.path.join(venv_dir, "Scripts", "python.exe")
+        else:
+            pip_path = os.path.join(venv_dir, "bin", "pip")
+            python_path = os.path.join(venv_dir, "bin", "python")
+
+        # 检查 venv 是否创建成功
+        if not os.path.exists(python_path):
+            print_error(f"虚拟环境创建失败: {python_path} 不存在")
+            print_info("请手动安装 python3-venv: sudo apt install python3-venv")
+            return None
+
+        # 升级 pip
+        print_info("升级 pip...")
+        subprocess.run([python_path, "-m", "pip", "install", "--upgrade", "pip"], capture_output=True)
+
+        # 安装依赖
+        print_info("安装 Python 依赖...")
+        requirements_path = os.path.join(project_dir, "requirements.txt")
+        if os.path.exists(requirements_path):
+            subprocess.run([pip_path, "install", "-r", requirements_path])
+        else:
+            # 直接安装核心依赖
+            print_info("未找到 requirements.txt，安装核心依赖...")
+            subprocess.run([pip_path, "install", "DrissionPage>=4.0.0", "PyYAML>=6.0", "requests>=2.28.0"])
+
+        print_success("Python 环境配置完成")
+        return python_path
+
+
+# ============================================================
+# 定时任务管理
+# ============================================================
+class CronManager:
+    """定时任务管理"""
+
+    def __init__(self, sys_info: SystemInfo):
+        self.sys_info = sys_info
+
+    def setup(self):
+        """设置定时任务"""
+        print_step("配置定时任务...")
+
+        confirm = input("是否设置定时任务？[y/N]: ").strip().lower()
+        if confirm not in ("y", "yes"):
+            print_info("跳过定时任务配置")
+            return
+
+        if self.sys_info.os_type == "windows":
+            self._setup_windows_task()
+        elif self.sys_info.os_type == "macos":
+            self._setup_launchd()
+        else:
+            self._setup_cron()
+
+    def _setup_windows_task(self):
+        """设置 Windows 任务计划"""
+        project_dir = os.getcwd()
+        python_path = os.path.join(project_dir, "venv", "Scripts", "python.exe")
+        main_script = os.path.join(project_dir, "main.py")
+
+        # 选择时间
+        print()
+        print("选择签到时间:")
+        print("  1. 每天 8:00 和 20:00（推荐）")
+        print("  2. 每天 9:00")
+        print("  3. 自定义")
+        choice = input("请选择 [1-3]: ").strip()
+
+        times = []
+        if choice == "1":
+            times = ["08:00", "20:00"]
+        elif choice == "2":
+            times = ["09:00"]
+        elif choice == "3":
+            t1 = input("第一个时间 (如 08:00): ").strip()
+            times.append(t1)
+            t2 = input("第二个时间 (直接回车跳过): ").strip()
+            if t2:
+                times.append(t2)
+        else:
+            times = ["08:00", "20:00"]
+
+        # 创建任务
+        for i, time in enumerate(times, 1):
+            task_name = f"LinuxDO-Checkin-{i}"
+            cmd = f'schtasks /create /tn "{task_name}" /tr "\\"{python_path}\\" \\"{main_script}\\"" /sc daily /st {time} /f'
+            result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            if result.returncode == 0:
+                print_success(f"任务 {task_name} 已创建 ({time})")
+            else:
+                print_error(f"创建任务失败: {result.stderr}")
+
+    def _setup_launchd(self):
+        """设置 macOS launchd"""
+        project_dir = os.getcwd()
+        python_path = os.path.join(project_dir, "venv", "bin", "python")
+        main_script = os.path.join(project_dir, "main.py")
+        plist_path = os.path.expanduser("~/Library/LaunchAgents/com.linuxdo.checkin.plist")
+
+        plist_content = f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.linuxdo.checkin</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{python_path}</string>
+        <string>{main_script}</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>{project_dir}</string>
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Hour</key>
+            <integer>8</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <dict>
+            <key>Hour</key>
+            <integer>20</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+    </array>
+    <key>StandardOutPath</key>
+    <string>{project_dir}/logs/checkin.log</string>
+    <key>StandardErrorPath</key>
+    <string>{project_dir}/logs/checkin.log</string>
+</dict>
+</plist>
+"""
+        # 创建日志目录
+        os.makedirs(os.path.join(project_dir, "logs"), exist_ok=True)
+
+        # 写入 plist
+        with open(plist_path, "w") as f:
+            f.write(plist_content)
+
+        # 加载任务
+        subprocess.run(["launchctl", "unload", plist_path], capture_output=True)
+        subprocess.run(["launchctl", "load", plist_path])
+
+        print_success("macOS 定时任务已设置")
+
+    def _setup_cron(self):
+        """设置 Linux cron"""
+        project_dir = os.getcwd()
+        python_path = os.path.join(project_dir, "venv", "bin", "python")
+
+        # 选择时间
+        print()
+        print("选择签到时间:")
+        print("  1. 每天 8:00 和 20:00（推荐）")
+        print("  2. 每天 9:00")
+        print("  3. 自定义")
+        choice = input("请选择 [1-3]: ").strip()
+
+        # 检测是否有图形界面
+        has_display = self.sys_info.has_display
+
+        # 构建 cron 命令
+        # 有图形界面：直接运行，设置 DISPLAY
+        # 无图形界面：使用 xvfb-run 或无头模式
+        if has_display:
+            # 有图形界面，设置 DISPLAY 环境变量
+            display = os.environ.get("DISPLAY", ":0")
+            cmd_prefix = f"DISPLAY={display} "
+            cmd_suffix = f"{python_path} main.py >> logs/checkin.log 2>&1"
+            print_info(f"检测到图形界面 (DISPLAY={display})，将直接运行浏览器")
+        else:
+            # 无图形界面，使用 xvfb-run
+            if shutil.which("xvfb-run"):
+                cmd_prefix = ""
+                cmd_suffix = f"xvfb-run -a {python_path} main.py >> logs/checkin.log 2>&1"
+                print_info("无图形界面，将使用 xvfb-run 运行")
+            else:
+                # 没有 xvfb-run，建议使用无头模式
+                cmd_prefix = ""
+                cmd_suffix = f"{python_path} main.py >> logs/checkin.log 2>&1"
+                print_warning("未安装 xvfb-run，建议在 config.yaml 中设置 headless: true")
+
+        cron_entries = []
+        if choice == "1":
+            cron_entries = [
+                f"0 8 * * * cd {project_dir} && {cmd_prefix}{cmd_suffix}",
+                f"0 20 * * * cd {project_dir} && {cmd_prefix}{cmd_suffix}",
+            ]
+        elif choice == "2":
+            cron_entries = [
+                f"0 9 * * * cd {project_dir} && {cmd_prefix}{cmd_suffix}",
+            ]
+        elif choice == "3":
+            t1 = input("第一个时间 (cron 格式，如 0 8 * * *): ").strip()
+            cron_entries.append(f"{t1} cd {project_dir} && {cmd_prefix}{cmd_suffix}")
+            t2 = input("第二个时间 (直接回车跳过): ").strip()
+            if t2:
+                cron_entries.append(f"{t2} cd {project_dir} && {cmd_prefix}{cmd_suffix}")
+        else:
+            cron_entries = [
+                f"0 8 * * * cd {project_dir} && {cmd_prefix}{cmd_suffix}",
+                f"0 20 * * * cd {project_dir} && {cmd_prefix}{cmd_suffix}",
+            ]
+
+        # 创建日志目录
+        os.makedirs(os.path.join(project_dir, "logs"), exist_ok=True)
+
+        # 获取现有 crontab
+        try:
+            result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+            existing_cron = result.stdout if result.returncode == 0 else ""
+        except:
+            existing_cron = ""
+
+        # 移除旧的 LinuxDO 任务
+        lines = [l for l in existing_cron.split("\n") if "linuxdo" not in l.lower() and "LinuxDO" not in l]
+
+        # 添加新任务
+        lines.append("# LinuxDO 签到任务")
+        lines.extend(cron_entries)
+
+        # 写入 crontab
+        new_cron = "\n".join(lines) + "\n"
+        process = subprocess.Popen(["crontab", "-"], stdin=subprocess.PIPE, text=True)
+        process.communicate(input=new_cron)
+
+        print_success("Linux 定时任务已设置")
+        print_info("查看任务: crontab -l | grep -i linuxdo")
+
+
+# ============================================================
+# 主安装程序
+# ============================================================
+class Installer:
+    """主安装程序"""
+
+    def __init__(self):
+        self.sys_info = SystemInfo()
+        self.config = ConfigManager()
+        self.dep_installer = DependencyInstaller(self.sys_info)
+        self.cron_manager = CronManager(self.sys_info)
+
+    def run(self):
+        """运行安装程序"""
+        print_banner()
+
+        # 自动切换到项目根目录（脚本所在目录的上一级）
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_dir = os.path.dirname(script_dir)
+
+        # 如果当前不在项目目录，自动切换
+        if not os.path.exists("main.py") and not os.path.exists("requirements.txt"):
+            if os.path.exists(os.path.join(project_dir, "main.py")):
+                os.chdir(project_dir)
+                print_info(f"已切换到项目目录: {project_dir}")
+            else:
+                print_error("请在项目目录下运行此脚本")
+                print_info("cd /path/to/linuxdo-checkin && python install.py")
+                return
+
+        # 启动时检查更新
+        self._check_update_on_start()
+
+        # 显示系统信息
+        self.sys_info.print_info()
+
+        # 显示主菜单
+        self.main_menu()
+
+    def _check_update_on_start(self):
+        """启动时检查更新"""
+        try:
+            # 尝试导入 updater 模块
+            import sys
+            project_dir = os.getcwd()
+            if project_dir not in sys.path:
+                sys.path.insert(0, project_dir)
+
+            # 检查必要文件是否存在
+            if not os.path.exists(os.path.join(project_dir, "updater.py")):
+                print_info("跳过更新检查（updater.py 不存在）")
+                return
+
+            if not os.path.exists(os.path.join(project_dir, "version.py")):
+                print_info("跳过更新检查（version.py 不存在）")
+                return
+
+            from updater import check_update, prompt_update
+            from version import __version__
+
+            print_info(f"当前版本: v{__version__}")
+            print_info("检查更新中...")
+
+            update_info = check_update(silent=True)
+            if update_info:
+                print()
+                print(f"{Colors.YELLOW}╔════════════════════════════════════════════════════════════╗{Colors.NC}")
+                print(f"{Colors.YELLOW}║{Colors.NC}  发现新版本: v{update_info['latest_version']:<44} {Colors.YELLOW}║{Colors.NC}")
+                print(f"{Colors.YELLOW}╚════════════════════════════════════════════════════════════╝{Colors.NC}")
+                print()
+
+                choice = input("是否现在更新？[Y/n]: ").strip().lower()
+                if choice != 'n':
+                    # 调用更新函数
+                    prompt_update()
+                    print()
+                    print_warning("更新完成后请重新运行此脚本")
+                    input("按 Enter 键退出...")
+                    sys.exit(0)
+                print()
+            else:
+                print_success("已是最新版本")
+                print()
+        except ImportError as e:
+            # 缺少依赖（如 requests），可能是首次安装
+            print_warning(f"跳过更新检查（缺少依赖: {e}）")
+            print_info("如果是首次使用，请选择 1. 一键安装")
+            print()
+        except Exception as e:
+            # 更新检测失败不影响正常使用
+            print_warning(f"更新检查失败: {e}")
+            print()
+
+    def main_menu(self):
+        """主菜单"""
+        while True:
+            print()
+            print("┌────────────────────────────────────────┐")
+            print("│                主菜单                  │")
+            print("├────────────────────────────────────────┤")
+            print("│  1. 一键安装（推荐）                   │")
+            print("│  2. 仅安装依赖                         │")
+            print("│  3. 仅配置 Python 环境                 │")
+            print("│  4. 编辑配置文件                       │")
+            print("│  5. 设置定时任务                       │")
+            print("│  6. 首次登录                           │")
+            print("│  7. 运行签到                           │")
+            print("│  8. 查看系统信息                       │")
+            print("│  0. 退出                               │")
+            print("└────────────────────────────────────────┘")
+            print()
+
+            choice = input("请选择 [0-8]: ").strip()
+
+            if choice == "0":
+                print_info("退出")
+                break
+            elif choice == "1":
+                self.full_install()
+            elif choice == "2":
+                self.dep_installer.install_all()
+            elif choice == "3":
+                self.dep_installer.setup_python_env()
+            elif choice == "4":
+                self.config.interactive_edit()
+            elif choice == "5":
+                self.cron_manager.setup()
+            elif choice == "6":
+                self.first_login()
+            elif choice == "7":
+                self.run_checkin()
+            elif choice == "8":
+                self.sys_info.print_info()
+            else:
+                print_error("无效选项")
+
+    def full_install(self):
+        """完整安装"""
+        print()
+        print_step("开始一键安装...")
+        print()
+
+        # 1. 安装系统依赖
+        self.dep_installer.install_all()
+        print()
+
+        # 2. 配置 Python 环境
+        python_path = self.dep_installer.setup_python_env()
+        print()
+
+        # 3. 验证并测试浏览器
+        self._verify_and_test_browser()
+        print()
+
+        # 4. 交互式配置
+        self._interactive_config()
+        print()
+
+        # 5. 设置定时任务
+        self.cron_manager.setup()
+        print()
+
+        # 6. 首次登录
+        self.first_login()
+        print()
+
+        # 7. 完成
+        self._print_completion()
+
+    def _verify_and_test_browser(self):
+        """验证并测试浏览器"""
+        print()
+        print_step("========== 浏览器验证 ==========")
+        print()
+
+        # 重新检测浏览器
+        self.sys_info._detect_browser()
+
+        if not self.sys_info.browser_path:
+            print_error("未检测到 Google Chrome！")
+            print_info("Snap 版 Chromium 不支持，必须安装 Google Chrome")
+            print()
+            print_info("请手动安装 Google Chrome:")
+            if self.sys_info.os_type == "linux":
+                print("  wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb")
+                print("  sudo dpkg -i google-chrome-stable_current_amd64.deb")
+                print("  sudo apt-get install -f -y")
+            else:
+                print("  下载地址: https://www.google.com/chrome/")
+            print()
+            choice = input("是否继续安装？[y/N]: ").strip().lower()
+            if choice not in ("y", "yes"):
+                return
+        else:
+            print_success(f"检测到浏览器: {self.sys_info.browser_path}")
+
+            # 获取版本号
+            version = self.sys_info.get_browser_version()
+            if version:
+                print_info(f"浏览器版本: {version}")
+
+            # 测试浏览器启动（打开可见窗口）
+            print()
+            print_info("即将打开浏览器窗口，请确认浏览器能正常显示...")
+            print()
+
+            if self.sys_info.test_browser_launch():
+                print_success("浏览器启动测试通过！")
+            else:
+                print_error("浏览器启动测试失败！")
+                print_info("请检查浏览器安装或图形界面配置")
+                choice = input("是否继续安装？[y/N]: ").strip().lower()
+                if choice not in ("y", "yes"):
+                    return
+
+    def _interactive_config(self):
+        """交互式配置"""
+        print_step("配置向导...")
+        print()
+
+        # 检查是否已有配置
+        if os.path.isdir("config.yaml"):
+            print_warning("config.yaml 是一个目录而不是文件，正在自动修复...")
+            import shutil as _shutil
+            _shutil.rmtree("config.yaml")
+            print_success("已删除错误的 config.yaml 目录")
+        elif os.path.isfile("config.yaml"):
+            print_warning("检测到已有配置文件")
+            choice = input("是否重新配置？[y/N]: ").strip().lower()
+            if choice not in ("y", "yes"):
+                print_info("使用现有配置")
+                return
+
+        print("请输入配置信息（直接回车使用默认值）:")
+        print()
+
+        # 用户名
+        username = input("Linux.do 用户名 (可选): ").strip()
+        self.config.set("username", username)
+
+        # 密码
+        if username:
+            password = input("Linux.do 密码 (可选): ").strip()
+            self.config.set("password", password)
+
+        # 浏览帖子数
+        browse_count = input("浏览帖子数量 [10]: ").strip()
+        if browse_count:
+            try:
+                self.config.set("browse_count", int(browse_count))
+            except:
+                pass
+
+        # 点赞概率
+        like_prob = input("点赞概率 (0-1) [0.3]: ").strip()
+        if like_prob:
+            try:
+                self.config.set("like_probability", float(like_prob))
+            except:
+                pass
+
+        # 无头模式
+        if not self.sys_info.has_display:
+            print_info("未检测到图形界面，建议使用无头模式")
+            headless_default = "true"
+        else:
+            headless_default = "false"
+        headless = input(f"无头模式 (true/false) [{headless_default}]: ").strip().lower()
+        if headless:
+            self.config.set("headless", headless in ("true", "1", "yes"))
+        else:
+            self.config.set("headless", headless_default == "true")
+
+        # 浏览器路径
+        if self.sys_info.browser_path:
+            print_info(f"检测到浏览器: {self.sys_info.browser_path}")
+            self.config.set("browser_path", self.sys_info.browser_path)
+
+        # 用户数据目录
+        default_user_data = os.path.join(self.sys_info.home_dir, ".linuxdo-browser")
+        user_data_dir = input(f"用户数据目录 [{default_user_data}]: ").strip()
+        self.config.set("user_data_dir", user_data_dir or default_user_data)
+
+        # 容器环境自动配置 chrome_args
+        # Linux 系统自动添加必要参数
+        chrome_args = []
+        if self.sys_info.os_type == "linux":
+            print()
+            print_info("Linux 系统将自动添加浏览器兼容参数")
+            # Linux 系统通常需要这些参数
+            chrome_args = [
+                "--no-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu"
+            ]
+            if self.sys_info.is_container:
+                print_warning("检测到容器环境 (LXC/Docker)")
+            print_info(f"已添加参数: {', '.join(chrome_args)}")
+        self.config.set("chrome_args", chrome_args)
+
+        # Telegram
+        print()
+        print("Telegram 通知配置（可选）:")
+        tg_token = input("Bot Token (直接回车跳过): ").strip()
+        if tg_token:
+            self.config.set("tg_bot_token", tg_token)
+            tg_chat_id = input("Chat ID: ").strip()
+            self.config.set("tg_chat_id", tg_chat_id)
+
+        # 保存配置
+        self.config.save()
+
+        # 创建用户数据目录
+        user_data_path = self.config.get("user_data_dir")
+        if user_data_path:
+            os.makedirs(user_data_path, exist_ok=True)
+            print_success(f"用户数据目录已创建: {user_data_path}")
+
+    def first_login(self):
+        """首次登录"""
+        print_step("首次登录...")
+
+        if not self.sys_info.has_display:
+            print()
+            print_warning("未检测到图形界面")
+            print()
+            print("首次登录需要图形界面来手动操作浏览器。")
+            print()
+            print(f"  {Colors.GREEN}方式1: VNC 远程桌面{Colors.NC}")
+            print("    安装: sudo apt install tigervnc-standalone-server")
+            print("    启动: vncserver :1")
+            print("    然后用 VNC 客户端连接")
+            print()
+            print(f"  {Colors.GREEN}方式2: SSH X11 转发{Colors.NC}")
+            print("    本地安装 X Server (Windows: VcXsrv, Mac: XQuartz)")
+            print("    SSH 连接: ssh -X user@host")
+            print("    设置: export DISPLAY=localhost:10.0")
+            print()
+            print(f"  {Colors.GREEN}方式3: 在其他电脑完成首次登录{Colors.NC}")
+            print("    1) 在有图形界面的电脑上运行首次登录")
+            print("    2) 将 ~/.linuxdo-browser 目录复制到本机")
+            print("    3) 之后可以无头模式运行")
+            print()
+            input("按 Enter 继续...")
+            return
+
+        confirm = input("是否现在进行首次登录？[Y/n]: ").strip().lower()
+        if confirm in ("n", "no"):
+            print_info("跳过首次登录")
+            print_info("稍后运行: python main.py --first-login")
+            return
+
+        # 运行首次登录
+        self._run_main_script("--first-login")
+
+    def run_checkin(self):
+        """运行签到"""
+        print_step("运行签到...")
+
+        if not self.sys_info.has_display and not self.config.get("headless"):
+            print_warning("无图形界面，尝试使用 xvfb-run...")
+            self._run_with_xvfb()
+        else:
+            self._run_main_script()
+
+    def _run_main_script(self, *args):
+        """运行主脚本"""
+        project_dir = self._get_project_dir()
+        venv_python = self._get_venv_python()
+        main_script = os.path.join(project_dir, "main.py")
+
+        if not os.path.exists(main_script):
+            print_error(f"找不到 main.py: {main_script}")
+            return
+
+        if venv_python and os.path.exists(venv_python):
+            cmd = [venv_python, main_script] + list(args)
+        else:
+            cmd = [sys.executable, main_script] + list(args)
+
+        subprocess.run(cmd, cwd=project_dir)
+
+    def _run_with_xvfb(self):
+        """使用 xvfb-run 运行"""
+        project_dir = self._get_project_dir()
+        venv_python = self._get_venv_python()
+        main_script = os.path.join(project_dir, "main.py")
+
+        if not os.path.exists(main_script):
+            print_error(f"找不到 main.py: {main_script}")
+            return
+
+        if venv_python and os.path.exists(venv_python):
+            python_cmd = venv_python
+        else:
+            python_cmd = sys.executable
+
+        if shutil.which("xvfb-run"):
+            subprocess.run(["xvfb-run", "-a", python_cmd, main_script], cwd=project_dir)
+        else:
+            print_warning("未安装 xvfb-run，尝试直接运行...")
+            subprocess.run([python_cmd, main_script], cwd=project_dir)
+
+    def _get_project_dir(self) -> str:
+        """获取项目根目录（包含 main.py 的目录）"""
+        # 优先使用当前目录
+        if os.path.exists(os.path.join(os.getcwd(), "main.py")):
+            return os.getcwd()
+
+        # 尝试脚本目录的上一级
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        parent_dir = os.path.dirname(script_dir)
+        if os.path.exists(os.path.join(parent_dir, "main.py")):
+            return parent_dir
+
+        # 返回当前目录
+        return os.getcwd()
+
+    def _get_venv_python(self) -> str:
+        """获取虚拟环境 Python 路径"""
+        project_dir = self._get_project_dir()
+        if self.sys_info.os_type == "windows":
+            return os.path.join(project_dir, "venv", "Scripts", "python.exe")
+        else:
+            return os.path.join(project_dir, "venv", "bin", "python")
+
+    def _print_completion(self):
+        """打印完成信息"""
+        print()
+        print(f"{Colors.GREEN}╔════════════════════════════════════════════════════════════╗{Colors.NC}")
+        print(f"{Colors.GREEN}║                    安装完成！                              ║{Colors.NC}")
+        print(f"{Colors.GREEN}╚════════════════════════════════════════════════════════════╝{Colors.NC}")
+        print()
+        print("后续操作:")
+        print()
+        print(f"  {Colors.CYAN}1. 首次登录（如果还没完成）:{Colors.NC}")
+        if self.sys_info.os_type == "windows":
+            print("     .\\venv\\Scripts\\python.exe main.py --first-login")
+        else:
+            print("     ./venv/bin/python main.py --first-login")
+        print()
+        print(f"  {Colors.CYAN}2. 手动运行签到:{Colors.NC}")
+        if self.sys_info.os_type == "windows":
+            print("     .\\venv\\Scripts\\python.exe main.py")
+        else:
+            print("     ./venv/bin/python main.py")
+        print()
+        print(f"  {Colors.CYAN}3. 编辑配置:{Colors.NC}")
+        print("     python setup.py  # 选择 4")
+        print()
+        print(f"  {Colors.CYAN}4. 查看日志:{Colors.NC}")
+        if self.sys_info.os_type == "windows":
+            print("     type logs\\checkin.log")
+        else:
+            print("     tail -f logs/checkin.log")
+        print()
+
+        if not self.sys_info.has_display:
+            print(f"{Colors.YELLOW}提示: 当前无图形界面，首次登录请参考上述方案{Colors.NC}")
+            print()
+
+        print("项目地址: https://github.com/xtgm/linux-do-max")
+        print()
+
+
+# ============================================================
+# 入口
+# ============================================================
+def main():
+    """主入口"""
+    try:
+        installer = Installer()
+        installer.run()
+    except KeyboardInterrupt:
+        print()
+        print_info("用户取消")
+    except Exception as e:
+        print_error(f"发生错误: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+if __name__ == "__main__":
+    main()

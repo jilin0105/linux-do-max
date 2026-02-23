@@ -1,0 +1,770 @@
+"""
+签到核心逻辑模块
+"""
+import time
+import random
+import re
+import json
+from typing import Optional, Dict, List
+from .browser import Browser
+from .config import config
+from .notify import Notifier
+
+
+class Checkin:
+    """签到类"""
+
+    SITE_URL = "https://linux.do"
+    CONNECT_URL = "https://connect.linux.do"
+
+    def __init__(self):
+        self.username: Optional[str] = None
+        self.level: int = 0
+        self.progress: Optional[Dict] = None
+        self.stats = {
+            'browse_count': 0,
+            'read_comments': 0,
+            'like_count': 0,
+        }
+        # 限流状态
+        self._rate_limited_until: float = 0
+        # 浏览器实例（每次运行创建新的）
+        self._browser: Optional[Browser] = None
+        # 通知实例
+        self._notifier: Optional[Notifier] = None
+
+    @property
+    def browser(self) -> Browser:
+        """获取浏览器实例"""
+        if self._browser is None:
+            self._browser = Browser()
+        return self._browser
+
+    @property
+    def notifier(self) -> Notifier:
+        """获取通知实例"""
+        if self._notifier is None:
+            self._notifier = Notifier()
+        return self._notifier
+
+    def is_rate_limited(self) -> bool:
+        """检查是否在限流期内"""
+        if time.time() < self._rate_limited_until:
+            remaining = int(self._rate_limited_until - time.time())
+            print(f"[签到] 限流中，剩余 {remaining} 秒")
+            return True
+        return False
+
+    def set_rate_limited(self, duration: int = 1800):
+        """设置限流状态（默认30分钟）"""
+        self._rate_limited_until = time.time() + duration
+        print(f"[签到] 设置限流 {duration} 秒")
+
+    def run(self) -> bool:
+        """执行签到流程"""
+        print("=" * 50)
+        print("[签到] 开始执行 Linux.do 签到")
+        print("=" * 50)
+
+        try:
+            # 0. 磁盘空间预检查（仅 Linux，空间不足时先清理缓存）
+            from .browser import check_disk_and_clean
+            check_disk_and_clean()
+
+            # 1. 启动浏览器
+            if not self.browser.start():
+                return self._finish(False)
+
+            # 启动后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] 浏览器启动完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            # 2. 访问首页
+            print("[签到] 访问 Linux.do 首页...")
+            if not self.browser.goto(self.SITE_URL):
+                return self._finish(False)
+
+            # 首页加载后停留 5-8 秒
+            wait = random.uniform(5, 8)
+            print(f"[签到] 首页加载完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            # 2.5. 检查首页是否触发 403（截图中的场景）
+            if self.browser.check_cf_403():
+                print("[签到] 首页触发 403，处理 CF 验证...")
+                if not self.browser.handle_cf_403(self.SITE_URL):
+                    print("[签到] CF 验证失败")
+                    return self._finish(False)
+                # 验证通过后重新访问首页
+                print("[签到] CF 验证通过，重新访问首页...")
+                if not self.browser.goto(self.SITE_URL, wait=3):
+                    return self._finish(False)
+                time.sleep(random.uniform(3, 5))
+
+            # 3. 等待 CF 验证
+            if not self.browser.wait_for_cf():
+                print("[签到] CF 验证失败")
+                return self._finish(False)
+
+            # CF 验证后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] CF 验证通过，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            # 4. 检查登录状态
+            if not self._check_login():
+                return self._finish(False)
+
+            # 登录检查后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] 登录状态确认，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            # 5. 获取用户信息
+            self._get_user_info()
+
+            # 获取用户信息后停留 5-8 秒
+            wait = random.uniform(5, 8)
+            print(f"[签到] 用户信息获取完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            # 6. 浏览帖子
+            self._browse_posts()
+
+            # 浏览帖子后停留 5-10 秒
+            wait = random.uniform(5, 10)
+            print(f"[签到] 帖子浏览完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            # 7. 获取升级进度
+            self._get_progress()
+
+            # 获取进度后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] 进度获取完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            # 8. 完成
+            return self._finish(True)
+
+        except Exception as e:
+            print(f"[签到] 执行异常: {e}")
+            import traceback
+            traceback.print_exc()
+            return self._finish(False)
+
+    def _finish(self, success: bool) -> bool:
+        """完成签到，发送通知"""
+        print("=" * 50)
+        if success:
+            print("[签到] 签到完成")
+        else:
+            print("[签到] 签到失败")
+        print("=" * 50)
+
+        # 发送通知
+        self.notifier.send_checkin_result(
+            success=success,
+            username=self.username or "未知",
+            stats=self.stats,
+            level=self.level,
+            progress=self.progress
+        )
+
+        # 关闭浏览器
+        self.browser.quit()
+
+        # Linux 系统强制清理缓存（容器/VPS 每次签到后必须清理）
+        # 仅保留登录状态，清除所有缓存和临时文件
+        from .browser import clear_browser_cache, is_linux
+        if is_linux():
+            print()
+            clear_browser_cache()
+
+        return success
+
+    def _check_login(self) -> bool:
+        """检查登录状态"""
+        print("[签到] 检查登录状态...")
+
+        if self.browser.is_logged_in():
+            self.username = self.browser.get_current_user()
+            print(f"[签到] 已登录: {self.username}")
+            return True
+
+        # 未登录，尝试使用用户名密码登录
+        if config.username and config.password:
+            return self._login_with_password()
+
+        # 未登录且无凭据
+        print("[签到] 未登录，请先运行 --first-login 进行首次登录")
+        return False
+
+    def _login_with_password(self) -> bool:
+        """使用用户名密码登录"""
+        print("[签到] 尝试使用用户名密码登录...")
+
+        try:
+            # 点击登录按钮
+            login_btn = self.browser.page.ele("css:.login-button", timeout=5)
+            if login_btn:
+                login_btn.click()
+                time.sleep(2)
+
+            # 输入用户名
+            username_input = self.browser.page.ele("css:#login-account-name", timeout=5)
+            if username_input:
+                username_input.clear()
+                username_input.input(config.username)
+
+            # 输入密码
+            password_input = self.browser.page.ele("css:#login-account-password", timeout=5)
+            if password_input:
+                password_input.clear()
+                password_input.input(config.password)
+
+            # 点击登录
+            submit_btn = self.browser.page.ele("css:#login-button", timeout=5)
+            if submit_btn:
+                submit_btn.click()
+                time.sleep(3)
+
+            # 检查是否登录成功
+            if self.browser.is_logged_in():
+                self.username = self.browser.get_current_user()
+                print(f"[签到] 登录成功: {self.username}")
+                return True
+            else:
+                print("[签到] 登录失败")
+                return False
+
+        except Exception as e:
+            print(f"[签到] 登录异常: {e}")
+            return False
+
+    def _get_user_info(self):
+        """获取用户信息（等级等）- 从 connect.linux.do 获取"""
+        print("[签到] 获取用户信息...")
+
+        try:
+            # 访问前停留 2-4 秒
+            wait = random.uniform(2, 4)
+            print(f"[签到] 准备访问 Connect 页面，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            # 直接从 connect.linux.do 获取等级（更可靠）
+            self.browser.goto(self.CONNECT_URL, wait=3)
+
+            # 页面加载后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] Connect 页面加载中，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            # 检查 403
+            if self.browser.check_cf_403():
+                print("[签到] Connect 页面触发 403，处理 CF 验证...")
+                if not self.browser.handle_cf_403(self.CONNECT_URL):
+                    print("[签到] CF 验证失败，跳过获取用户信息")
+                    return
+                self.browser.goto(self.CONNECT_URL, wait=3)
+                time.sleep(random.uniform(2, 4))
+
+            # 等待 CF 验证
+            if not self.browser.wait_for_cf(timeout=60):
+                print("[签到] Connect 页面 CF 验证失败")
+                return
+
+            # CF 验证后停留 2-4 秒
+            wait = random.uniform(2, 4)
+            print(f"[签到] CF 验证通过，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            # 从页面 HTML 解析等级
+            # 新版格式: "信任级别 2"（在用户菜单中）
+            # 旧版格式: "2级用户"
+            html = self.browser.page.html
+            match = re.search(r'信任级别\s*(\d+)', html)
+            if not match:
+                match = re.search(r'(\d+)级用户', html)
+            if match:
+                self.level = int(match.group(1))
+                print(f"[签到] 用户等级: {self.level}")
+            else:
+                print("[签到] 未能解析用户等级")
+
+            # 1级用户没有进度表格，页面只显示"达到 2 级可查看"
+            if self.level < 2:
+                print("[签到] 1级用户无进度表格，跳过")
+                return
+
+            # 等待进度卡片渲染完成（最多 15 秒）
+            table_found = False
+            selectors = ['.tl3-rings', '.tl3-bars']
+            for _ in range(30):
+                for sel in selectors:
+                    try:
+                        el = self.browser.page.ele(f"css:{sel}", timeout=0.3)
+                        if el:
+                            table_found = True
+                            break
+                    except:
+                        pass
+                if table_found:
+                    break
+                time.sleep(0.5)
+
+            if table_found:
+                # 表格出现了，等待内容完全渲染
+                time.sleep(1)
+                html = self.browser.page.html
+                self.progress = self._parse_progress_from_html(html)
+
+            if self.progress:
+                print(f"[签到] 获取到升级进度: {len(self.progress)} 项")
+            else:
+                print("[签到] 未获取到升级进度")
+
+        except Exception as e:
+            print(f"[签到] 获取用户信息异常: {e}")
+
+    def _browse_posts(self):
+        """浏览帖子（随机浏览，优先评论多的帖子）"""
+        print(f"[签到] 开始浏览帖子，目标: {config.browse_count} 篇")
+
+        # 开始浏览前停留 3-5 秒
+        wait = random.uniform(3, 5)
+        print(f"[签到] 准备获取帖子列表，等待 {wait:.1f} 秒...")
+        time.sleep(wait)
+
+        # 随机获取帖子（优先评论多的）
+        posts = self._get_random_posts_with_replies()
+        if not posts:
+            print("[签到] 未获取到帖子列表")
+            return
+
+        print(f"[签到] 获取到 {len(posts)} 个帖子（按评论数排序后随机选取）")
+
+        # 获取帖子列表后停留 3-5 秒
+        wait = random.uniform(3, 5)
+        print(f"[签到] 帖子列表获取完成，等待 {wait:.1f} 秒...")
+        time.sleep(wait)
+
+        # 浏览帖子
+        browse_count = min(config.browse_count, len(posts))
+        for i, post_info in enumerate(posts[:browse_count]):
+            if self.is_rate_limited():
+                print("[签到] 限流中，停止浏览")
+                break
+
+            post_url = post_info['url']
+            reply_count = post_info.get('replies', 0)
+            print(f"[签到] 浏览帖子 {i + 1}/{browse_count} (评论:{reply_count}): {post_url}")
+
+            # 访问帖子前停留 2-4 秒
+            wait = random.uniform(2, 4)
+            print(f"[签到] 准备访问帖子，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            if not self.browser.goto(post_url, wait=2):
+                continue
+
+            # 帖子加载后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] 帖子加载完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            # 检查 CF 403（403 是 CF 5秒盾触发的前提）
+            if self.browser.check_cf_403():
+                print("[签到] 检测到 403，停止任务等待 CF 验证...")
+                # 停止所有任务，等待 CF 验证成功
+                if not self._wait_cf_verification(post_url):
+                    print("[签到] CF 验证失败，终止签到")
+                    return  # 终止整个签到流程
+                # 验证成功后重新访问当前帖子
+                print(f"[签到] CF 验证通过，重新访问帖子: {post_url}")
+                if not self.browser.goto(post_url, wait=3):
+                    continue
+
+            # 检查限流
+            if self.browser.check_rate_limit():
+                self.set_rate_limited()
+                break
+
+            # 滑动浏览帖子（模拟真实阅读）
+            self._scroll_post()
+
+            # 滑动完成后停留 3-5 秒
+            wait = random.uniform(3, 5)
+            print(f"[签到] 阅读完成，等待 {wait:.1f} 秒...")
+            time.sleep(wait)
+
+            # 统计浏览
+            self.stats['browse_count'] += 1
+
+            # 统计评论数
+            comments = self._count_comments()
+            self.stats['read_comments'] += comments
+
+            # 随机点赞
+            if random.random() < config.like_probability:
+                # 点赞前停留 2-3 秒
+                wait = random.uniform(2, 3)
+                print(f"[签到] 准备点赞，等待 {wait:.1f} 秒...")
+                time.sleep(wait)
+                if self._like_post():
+                    self.stats['like_count'] += 1
+                    # 点赞后停留 2-3 秒
+                    wait = random.uniform(2, 3)
+                    print(f"[签到] 点赞完成，等待 {wait:.1f} 秒...")
+                    time.sleep(wait)
+
+            # 帖子停留时间（15-30秒，从配置读取，最高30秒）
+            wait_time = random.uniform(config.browse_interval_min, min(config.browse_interval_max, 30))
+            print(f"[签到] 停留 {wait_time:.0f} 秒...")
+            time.sleep(wait_time)
+
+        print(f"[签到] 浏览完成，共浏览 {self.stats['browse_count']} 篇")
+
+    def _get_random_posts_with_replies(self) -> List[Dict]:
+        """随机获取帖子，优先评论多的帖子"""
+        all_posts = []
+
+        # 随机选择一个页面类型
+        page_types = [
+            (f"{self.SITE_URL}/latest", "最新"),
+            (f"{self.SITE_URL}/top", "热门"),
+            (f"{self.SITE_URL}/new", "新帖"),
+        ]
+
+        # 随机打乱页面顺序
+        random.shuffle(page_types)
+
+        # 只访问前2个页面（减少请求）
+        for url, name in page_types[:2]:
+            print(f"[签到] 获取 {name} 帖子...")
+            if not self.browser.goto(url, wait=3):
+                continue
+
+            # 检查 403
+            if self.browser.check_cf_403():
+                print(f"[签到] 获取 {name} 帖子时触发 403，处理 CF 验证...")
+                if not self.browser.handle_cf_403(url):
+                    print("[签到] CF 验证失败，跳过此页面")
+                    continue
+                # 验证通过后重新访问
+                if not self.browser.goto(url, wait=3):
+                    continue
+
+            # 检查限流
+            if self.browser.check_rate_limit():
+                self.set_rate_limited()
+                break
+
+            # 获取帖子列表（带评论数）
+            posts = self._get_post_list_with_replies()
+            if posts:
+                print(f"[签到] {name}: {len(posts)} 篇")
+                all_posts.extend(posts)
+
+        # 去重（按URL）
+        seen = set()
+        unique_posts = []
+        for post in all_posts:
+            if post['url'] not in seen:
+                seen.add(post['url'])
+                unique_posts.append(post)
+
+        # 按评论数排序（评论多的优先）
+        unique_posts.sort(key=lambda x: x.get('replies', 0), reverse=True)
+
+        # 取前20个评论最多的，然后随机打乱
+        top_posts = unique_posts[:20]
+        random.shuffle(top_posts)
+
+        return top_posts
+
+    def _get_post_list_with_replies(self) -> List[Dict]:
+        """获取帖子列表（带评论数）"""
+        posts = []
+        try:
+            # 获取帖子行
+            topic_rows = self.browser.page.eles("css:.topic-list-item")
+            for row in topic_rows:
+                try:
+                    # 获取链接
+                    link = row.ele("css:a.title", timeout=1)
+                    if not link:
+                        continue
+                    href = link.attr("href")
+                    if not href or "/t/" not in href:
+                        continue
+                    if href.startswith("/"):
+                        href = f"{self.SITE_URL}{href}"
+
+                    # 获取评论数
+                    replies = 0
+                    try:
+                        # 评论数在 .posts 或 .replies 列
+                        reply_cell = row.ele("css:.posts, .replies, .num.posts", timeout=1)
+                        if reply_cell:
+                            reply_text = reply_cell.text.strip()
+                            # 处理 "1.2k" 格式
+                            if 'k' in reply_text.lower():
+                                replies = int(float(reply_text.lower().replace('k', '')) * 1000)
+                            elif reply_text.isdigit():
+                                replies = int(reply_text)
+                    except:
+                        pass
+
+                    posts.append({
+                        'url': href,
+                        'replies': replies
+                    })
+                except:
+                    continue
+
+            # 去重
+            seen = set()
+            unique_posts = []
+            for post in posts:
+                if post['url'] not in seen:
+                    seen.add(post['url'])
+                    unique_posts.append(post)
+            posts = unique_posts
+
+        except Exception as e:
+            print(f"[签到] 获取帖子列表异常: {e}")
+
+        return posts
+
+    def _scroll_post(self):
+        """滑动浏览帖子到底部，模拟真实阅读"""
+        try:
+            if not self.browser.page:
+                return
+
+            # 获取页面高度
+            page_height = self.browser.page.run_js("return document.body.scrollHeight")
+            viewport_height = self.browser.page.run_js("return window.innerHeight")
+
+            if not page_height or not viewport_height:
+                return
+
+            # 分段滑动到底部
+            current_pos = 0
+            scroll_step = viewport_height * 0.7  # 每次滑动 70% 视口高度
+
+            while current_pos < page_height:
+                current_pos += scroll_step
+                self.browser.page.run_js(f"window.scrollTo(0, {int(current_pos)})")
+                # 随机等待 0.5-1.5 秒，模拟阅读
+                time.sleep(random.uniform(0.5, 1.5))
+
+                # 更新页面高度（帖子可能有懒加载）
+                new_height = self.browser.page.run_js("return document.body.scrollHeight")
+                if new_height and new_height > page_height:
+                    page_height = new_height
+
+            # 确保滑动到最底部
+            self.browser.page.run_js("window.scrollTo(0, document.body.scrollHeight)")
+            time.sleep(random.uniform(0.5, 1.0))
+
+        except Exception as e:
+            # 滑动失败不影响主流程
+            pass
+
+    def _count_comments(self) -> int:
+        """统计当前帖子的评论数"""
+        try:
+            posts = self.browser.page.eles("css:.topic-post")
+            return len(posts) - 1 if posts else 0  # 减去主帖
+        except:
+            return 0
+
+    def _wait_cf_verification(self, current_url: str) -> bool:
+        """等待 CF 验证完成（403 触发后调用）"""
+        return self.browser.handle_cf_403(current_url)
+
+    def _like_post(self) -> bool:
+        """点赞帖子"""
+        try:
+            # 查找点赞按钮（尝试多个选择器）
+            selectors = [
+                "css:.discourse-reactions-reaction-button",
+                "css:button.like",
+                "css:.actions button.like",
+            ]
+
+            for selector in selectors:
+                try:
+                    like_btn = self.browser.page.ele(selector, timeout=1)
+                    if like_btn:
+                        # 方案A：检查是否已点赞（避免重复点赞触发"不能修改"提示）
+                        btn_class = like_btn.attr("class") or ""
+                        if "has-like" in btn_class or "my-likes" in btn_class or "liked" in btn_class:
+                            print("[签到] 已点赞，跳过")
+                            return False
+
+                        like_btn.click()
+
+                        # 方案B：检测并关闭"不能再被修改或移除"对话框
+                        time.sleep(0.5)
+                        self._close_like_error_dialog()
+
+                        print("[签到] 点赞成功")
+                        time.sleep(0.5)
+                        return True
+                except:
+                    continue
+
+        except Exception as e:
+            print(f"[签到] 点赞失败: {e}")
+        return False
+
+    def _close_like_error_dialog(self):
+        """关闭点赞错误对话框（如"不能再被修改或移除"）"""
+        try:
+            dialog = self.browser.page.ele("css:.dialog-body", timeout=1)
+            if dialog and ("不能再被修改" in dialog.text or "无法" in dialog.text):
+                ok_btn = self.browser.page.ele("css:.dialog-footer .btn-primary", timeout=1)
+                if ok_btn:
+                    ok_btn.click()
+                    print("[签到] 已关闭点赞提示对话框")
+                    time.sleep(0.5)
+        except:
+            pass
+
+    def _get_progress(self):
+        """获取升级进度（已在 _get_user_info 中获取）"""
+        # 如果已经有进度数据，跳过
+        if self.progress:
+            return
+
+        if self.level < 2:
+            print("[签到] 等级低于2级，无进度表格可获取")
+            return
+
+        print("[签到] 重新获取升级进度...")
+
+        try:
+            # 访问 connect.linux.do
+            self.browser.goto(self.CONNECT_URL, wait=3)
+
+            # 等待 CF 验证
+            self.browser.wait_for_cf(timeout=60)
+
+            # 等待卡片渲染（最多 15 秒）
+            table_found = False
+            selectors = ['.tl3-rings', '.tl3-bars']
+            for _ in range(30):
+                for sel in selectors:
+                    try:
+                        el = self.browser.page.ele(f"css:{sel}", timeout=0.3)
+                        if el:
+                            table_found = True
+                            break
+                    except:
+                        pass
+                if table_found:
+                    break
+                time.sleep(0.5)
+
+            if table_found:
+                time.sleep(1)
+                html = self.browser.page.html
+                self.progress = self._parse_progress_from_html(html)
+
+            if self.progress:
+                print(f"[签到] 获取到升级进度: {len(self.progress)} 项")
+            else:
+                print("[签到] 未获取到升级进度")
+
+        except Exception as e:
+            print(f"[签到] 获取进度异常: {e}")
+
+    def _parse_progress_from_html(self, html: str) -> Optional[Dict]:
+        """从 HTML 解析升级进度（卡片布局：tl3-rings/tl3-bars/tl3-quota/tl3-veto）"""
+        progress = {}
+
+        try:
+            # 环形图（访问天数、浏览话题、浏览帖子）
+            ring_pattern = r'<div\s+class="tl3-ring-circle\s+(met|unmet)"[^>]*>.*?<span\s+class="tl3-ring-current"[^>]*>(.*?)</span>\s*<span\s+class="tl3-ring-target"[^>]*>(.*?)</span>.*?<div\s+class="tl3-ring-label"[^>]*>(.*?)</div>'
+            ring_map = {'访问天数': 'visit_days', '浏览话题': 'topics_viewed', '浏览帖子': 'posts_read'}
+            for m in re.finditer(ring_pattern, html, re.DOTALL):
+                status, current_text, target_text, label = m.group(1), m.group(2).strip(), m.group(3).strip(), m.group(4).strip()
+                key = ring_map.get(label)
+                if key:
+                    current = self._parse_progress_value(current_text)
+                    required = self._parse_progress_value(target_text)
+                    progress[key] = {'current': current, 'required': required, 'completed': status == 'met', 'current_text': current_text, 'required_text': target_text}
+
+            # 进度条（回复话题、点赞、获赞、获赞天数、获赞用户）
+            bar_pattern = r'<span\s+class="tl3-bar-label"[^>]*>(.*?)</span>\s*<span\s+class="tl3-bar-nums\s+(met|unmet)"[^>]*>(.*?)</span>'
+            bar_map = {'回复话题': 'replies', '点赞': 'likes_given', '获赞': 'likes_received', '获赞天数': 'likes_received_days', '获赞用户': 'likes_received_users'}
+            for m in re.finditer(bar_pattern, html, re.DOTALL):
+                label, status, nums_text = m.group(1).strip(), m.group(2), m.group(3).strip()
+                key = bar_map.get(label)
+                if key:
+                    parts = nums_text.split('/')
+                    current_text = parts[0].strip() if len(parts) >= 1 else '0'
+                    required_text = parts[1].strip() if len(parts) >= 2 else '0'
+                    current = self._parse_progress_value(current_text)
+                    required = self._parse_progress_value(required_text)
+                    progress[key] = {'current': current, 'required': required, 'completed': status == 'met', 'current_text': current_text, 'required_text': required_text}
+
+            # 配额卡片（被举报帖子、举报用户）
+            quota_pattern = r'<div\s+class="tl3-quota-card\s+(met|unmet)"[^>]*>\s*<span\s+class="tl3-quota-label"[^>]*>(.*?)</span>\s*<span\s+class="tl3-quota-nums"[^>]*>(.*?)</span>'
+            quota_map = {'被举报帖子': 'flagged_posts', '举报用户': 'flagged_by_users'}
+            for m in re.finditer(quota_pattern, html, re.DOTALL):
+                status, label, nums_text = m.group(1), m.group(2).strip(), m.group(3).strip()
+                key = quota_map.get(label)
+                if key:
+                    parts = nums_text.split('/')
+                    current_text = parts[0].strip() if len(parts) >= 1 else '0'
+                    required_text = parts[1].strip() if len(parts) >= 2 else '0'
+                    current = self._parse_progress_value(current_text)
+                    required = self._parse_progress_value(required_text)
+                    progress[key] = {'current': current, 'required': required, 'completed': status == 'met', 'current_text': current_text, 'required_text': required_text}
+
+            # 否决项（被禁言、被封禁）— required 为 0，只取 front 面
+            veto_pattern = r'<div\s+class="tl3-veto-item\s+(met|unmet)"[^>]*>.*?<div\s+class="tl3-veto-face\s+tl3-veto-front"[^>]*>\s*<div\s+class="tl3-veto-label"[^>]*>(.*?)</div>\s*<span\s+class="tl3-veto-value"[^>]*>(.*?)</span>'
+            veto_map = {'被禁言': 'silenced', '被封禁': 'suspended'}
+            for m in re.finditer(veto_pattern, html, re.DOTALL):
+                status, label, value_text = m.group(1), m.group(2).strip(), m.group(3).strip()
+                key = veto_map.get(label)
+                if key:
+                    current = self._parse_progress_value(value_text)
+                    progress[key] = {'current': current, 'required': 0, 'completed': status == 'met', 'current_text': value_text, 'required_text': '0'}
+
+        except Exception as e:
+            print(f"[签到] 解析进度异常: {e}")
+
+        return progress if progress else None
+
+    def _parse_progress_value(self, text: str) -> int:
+        """解析当前进度值"""
+        # 去除千分位逗号（新版格式如 33,853）
+        text = text.replace(',', '')
+
+        # 格式1: 14% (14 / 100 天数) -> 取括号内第一个数字 14（旧版）
+        match = re.search(r'\((\d+)\s*/', text)
+        if match:
+            return int(match.group(1))
+
+        # 格式2: ≥ 22 -> 22
+        match = re.search(r'[≥>=]\s*(\d+)', text)
+        if match:
+            return int(match.group(1))
+
+        # 格式3: 纯数字 7170 -> 7170
+        match = re.search(r'^(\d+)$', text.strip())
+        if match:
+            return int(match.group(1))
+
+        # 格式4: 其他包含数字的情况
+        match = re.search(r'(\d+)', text)
+        if match:
+            return int(match.group(1))
+
+        return 0

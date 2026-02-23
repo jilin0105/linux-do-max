@@ -1,0 +1,303 @@
+name: 打包发布
+
+# 触发条件：推送 tag（如 v0.2.0）时自动运行
+on:
+  push:
+    tags:
+      - 'v*'
+  # 允许手动触发
+  workflow_dispatch:
+
+env:
+  TAG_VERSION: ${{ github.ref_name }}
+
+jobs:
+  # Windows x64 打包
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 自动更新版本号
+        shell: python
+        run: |
+          import re, os
+          tag = os.environ.get('TAG_VERSION', '').lstrip('v')
+          if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              with open('version.py', 'r', encoding='utf-8') as f:
+                  text = f.read()
+              parts = tag.split('.')
+              info = '(' + ', '.join(parts) + ')'
+              text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
+              text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
+              with open('version.py', 'w', encoding='utf-8') as f:
+                  f.write(text)
+              print('version.py updated to ' + tag)
+
+      - name: 安装依赖
+        run: |
+          pip install pyinstaller
+          pip install DrissionPage PyYAML requests
+
+      - name: 打包
+        run: |
+          pyinstaller --onefile --name linuxdo-checkin-windows-x64 main.py
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64
+          path: dist/linuxdo-checkin-windows-x64.exe
+
+  # macOS x64 打包
+  build-macos-x64:
+    runs-on: macos-15  # Intel Mac
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 自动更新版本号
+        shell: python
+        run: |
+          import re, os
+          tag = os.environ.get('TAG_VERSION', '').lstrip('v')
+          if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              with open('version.py', 'r', encoding='utf-8') as f:
+                  text = f.read()
+              parts = tag.split('.')
+              info = '(' + ', '.join(parts) + ')'
+              text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
+              text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
+              with open('version.py', 'w', encoding='utf-8') as f:
+                  f.write(text)
+              print('version.py updated to ' + tag)
+
+      - name: 安装依赖
+        run: |
+          pip install pyinstaller
+          pip install DrissionPage PyYAML requests
+
+      - name: 打包
+        run: |
+          pyinstaller --onefile --name linuxdo-checkin-macos-x64 main.py
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-x64
+          path: dist/linuxdo-checkin-macos-x64
+
+  # macOS ARM64 打包 (Apple Silicon)
+  build-macos-arm64:
+    runs-on: macos-latest  # Apple Silicon
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 自动更新版本号
+        shell: python
+        run: |
+          import re, os
+          tag = os.environ.get('TAG_VERSION', '').lstrip('v')
+          if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              with open('version.py', 'r', encoding='utf-8') as f:
+                  text = f.read()
+              parts = tag.split('.')
+              info = '(' + ', '.join(parts) + ')'
+              text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
+              text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
+              with open('version.py', 'w', encoding='utf-8') as f:
+                  f.write(text)
+              print('version.py updated to ' + tag)
+
+      - name: 安装依赖
+        run: |
+          pip install pyinstaller
+          pip install DrissionPage PyYAML requests
+
+      - name: 打包
+        run: |
+          pyinstaller --onefile --name linuxdo-checkin-macos-arm64 main.py
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64
+          path: dist/linuxdo-checkin-macos-arm64
+
+  # Linux x64 打包
+  build-linux-x64:
+    runs-on: ubuntu-22.04  # Ubuntu 22.04, glibc 2.35, 兼容 Debian 12+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 设置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 自动更新版本号
+        shell: python
+        run: |
+          import re, os
+          tag = os.environ.get('TAG_VERSION', '').lstrip('v')
+          if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              with open('version.py', 'r', encoding='utf-8') as f:
+                  text = f.read()
+              parts = tag.split('.')
+              info = '(' + ', '.join(parts) + ')'
+              text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
+              text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
+              with open('version.py', 'w', encoding='utf-8') as f:
+                  f.write(text)
+              print('version.py updated to ' + tag)
+
+      - name: 安装依赖
+        run: |
+          pip install pyinstaller
+          pip install DrissionPage PyYAML requests
+
+      - name: 打包
+        run: |
+          pyinstaller --onefile --name linuxdo-checkin-linux-x64 main.py
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-x64
+          path: dist/linuxdo-checkin-linux-x64
+
+  # Linux ARM64 打包 (树莓派等)
+  build-linux-arm64:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 自动更新版本号
+        shell: python
+        run: |
+          import re, os
+          tag = os.environ.get('TAG_VERSION', '').lstrip('v')
+          if tag and re.match(r'^\d+\.\d+\.\d+$', tag):
+              with open('version.py', 'r', encoding='utf-8') as f:
+                  text = f.read()
+              parts = tag.split('.')
+              info = '(' + ', '.join(parts) + ')'
+              text = re.sub(r'__version__ = ".*?"', '__version__ = "' + tag + '"', text)
+              text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
+              with open('version.py', 'w', encoding='utf-8') as f:
+                  f.write(text)
+              print('version.py updated to ' + tag)
+
+      - name: 设置 QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: 设置 Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: ARM64 环境打包
+        run: |
+          docker run --rm --platform linux/arm64 \
+            -v ${{ github.workspace }}:/work \
+            -w /work \
+            python:3.11-slim-bullseye \
+            bash -c "
+              apt-get update && apt-get install -y binutils && \
+              pip install pyinstaller DrissionPage PyYAML requests && \
+              pyinstaller --onefile --name linuxdo-checkin-linux-arm64 main.py
+            "
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64
+          path: dist/linuxdo-checkin-linux-arm64
+
+  # 创建 Release 并上传所有文件
+  release:
+    needs: [build-windows, build-macos-x64, build-macos-arm64, build-linux-x64, build-linux-arm64]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 下载所有构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 显示文件结构
+        run: ls -la artifacts/*/
+
+      - name: 创建 Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: LinuxDO 签到 ${{ github.ref_name }}
+          body: |
+            ## LinuxDO 自动签到工具 ${{ github.ref_name }}
+
+            ### 下载说明
+            根据你的系统选择对应版本：
+            - **Windows**: `linuxdo-checkin-windows-x64.exe`
+            - **macOS Intel**: `linuxdo-checkin-macos-x64`
+            - **macOS Apple Silicon**: `linuxdo-checkin-macos-arm64`
+            - **Linux x64**: `linuxdo-checkin-linux-x64`
+            - **Linux ARM64** (树莓派等): `linuxdo-checkin-linux-arm64`
+
+            ### 使用方法
+            1. 下载对应平台的可执行文件
+            2. 首次运行：`./linuxdo-checkin --first-login`
+            3. 之后运行：`./linuxdo-checkin`
+
+            ### 更新内容
+            请查看 [CHANGELOG](https://github.com/xtgm/linux-do-max/commits/main)
+          files: |
+            artifacts/windows-x64/*
+            artifacts/macos-x64/*
+            artifacts/macos-arm64/*
+            artifacts/linux-x64/*
+            artifacts/linux-arm64/*
+          draft: false
+          prerelease: false
+
+      - name: 同步版本号到仓库
+        run: |
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          python3 -c "
+          import re
+          tag = '$VERSION'
+          parts = tag.split('.')
+          info = '(' + ', '.join(parts) + ')'
+          with open('version.py', 'r') as f:
+              text = f.read()
+          text = re.sub(r'__version__ = \".*?\"', '__version__ = \"' + tag + '\"', text)
+          text = re.sub(r'__version_info__ = \(.*?\)', '__version_info__ = ' + info, text)
+          with open('version.py', 'w') as f:
+              f.write(text)
+          "
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.py
+          git diff --cached --quiet || git commit -m "chore: 同步版本号到 $TAG"
+          git push origin HEAD:main

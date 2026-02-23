@@ -1,0 +1,76 @@
+# ARM64 专用 Docker Compose 配置
+# 适用于: 树莓派 4/5、Apple Silicon Mac、ARM 服务器等
+#
+# 首次使用:
+#   1. mkdir -p config
+#   2. cp config.yaml.example config/config.yaml
+#   3. 编辑 config/config.yaml 填入你的配置
+#   4. docker-compose -f docker-compose.arm.yml build
+#   5. docker-compose -f docker-compose.arm.yml up -d
+#
+# 修改配置:
+#   1. 编辑 config/config.yaml
+#   2. docker-compose -f docker-compose.arm.yml restart
+
+version: '3.8'
+
+services:
+  linuxdo-checkin:
+    build:
+      context: .
+      dockerfile: Dockerfile.arm
+    container_name: linuxdo-checkin
+    # 签到是一次性任务，不需要自动重启
+    # 定时执行由 ofelia 调度器负责
+    restart: "no"
+    # ARM 设备通常内存较小，限制资源使用
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+    volumes:
+      # 持久化用户数据目录（保存登录状态）
+      - ./data/browser:/root/.linuxdo-browser
+      # 持久化日志
+      - ./logs:/app/logs
+      # 配置目录映射（将宿主机 ./config/ 目录映射到容器内 /app/config/）
+      # 首次使用: cp config.yaml.example config/config.yaml && 编辑 config/config.yaml
+      # 修改配置后重启容器即可生效
+      - ./config:/app/config
+    environment:
+      # 环境变量优先级高于 config.yaml
+      # 建议将所有配置写在 config.yaml 中，环境变量仅用于覆盖
+      - HEADLESS=false
+      # ARM 优化：减少 Chromium 内存占用
+      - CHROMIUM_FLAGS=--disable-dev-shm-usage --no-sandbox --disable-gpu
+
+  # 定时任务调度器（使用 ofelia）
+  # ofelia 支持多架构，包括 arm64
+  ofelia:
+    image: mcuadros/ofelia:latest
+    container_name: linuxdo-scheduler
+    restart: unless-stopped
+    depends_on:
+      - linuxdo-checkin
+    command: daemon --docker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      # 08:00 Telegram 提醒
+      - "ofelia.job-exec.reminder-am.schedule=0 0 8 * * *"
+      - "ofelia.job-exec.reminder-am.container=linuxdo-checkin"
+      - "ofelia.job-exec.reminder-am.command=python reminder.py"
+      # 08:01 自动签到
+      - "ofelia.job-exec.checkin-am.schedule=0 1 8 * * *"
+      - "ofelia.job-exec.checkin-am.container=linuxdo-checkin"
+      - "ofelia.job-exec.checkin-am.command=python main.py"
+      # 20:00 Telegram 提醒
+      - "ofelia.job-exec.reminder-pm.schedule=0 0 20 * * *"
+      - "ofelia.job-exec.reminder-pm.container=linuxdo-checkin"
+      - "ofelia.job-exec.reminder-pm.command=python reminder.py"
+      # 20:01 自动签到
+      - "ofelia.job-exec.checkin-pm.schedule=0 1 20 * * *"
+      - "ofelia.job-exec.checkin-pm.container=linuxdo-checkin"
+      - "ofelia.job-exec.checkin-pm.command=python main.py"
